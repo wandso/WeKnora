@@ -70,6 +70,26 @@ func (a *KBAccess) WithGrant(ctx context.Context) context.Context {
 	return context.WithValue(types.WithCaller(ctx, caller), types.KBGrantsContextKey, grants)
 }
 
+// ownsPrivateKnowledgeBase reports whether the caller may read a KB marked
+// private inside its own workspace: the creator, or a workspace Owner/Admin.
+//
+// A KB created before the visibility column existed can have an empty
+// CreatorID (rows migrated from the API-key era). Those stay readable by the
+// whole workspace because there is no creator to attribute them to, and
+// locking them away would hide data nobody agreed to hide.
+func ownsPrivateKnowledgeBase(kb *types.KnowledgeBase, caller types.Caller) bool {
+	if kb == nil {
+		return false
+	}
+	if caller.Role == types.TenantRoleOwner || caller.Role == types.TenantRoleAdmin {
+		return true
+	}
+	if kb.CreatorID == "" {
+		return true
+	}
+	return caller.UserID != "" && kb.CreatorID == caller.UserID
+}
+
 // KBShareLookup resolves organization sharing with the caller role cap.
 type KBShareLookup interface {
 	CheckTenantKBPermission(context.Context, string, uint64, types.TenantRole) (types.OrgMemberRole, bool, error)
@@ -115,7 +135,23 @@ func ResolveKB(ctx context.Context, request KBRequest, kb *types.KnowledgeBase, 
 		}, nil
 	}
 	if kb.TenantID == request.Caller.TenantID {
+		// Visibility still applies inside the owning workspace: a private KB
+		// is limited to its creator plus the workspace Owner/Admin. Without
+		// this check the tenant branch below would hand Admin to every
+		// colleague, which is exactly what "private" is meant to stop.
+		if types.NormalizeKnowledgeBaseVisibility(kb.Visibility) == types.KnowledgeBaseVisibilityPrivate &&
+			!ownsPrivateKnowledgeBase(kb, request.Caller) {
+			return nil, ErrForbidden
+		}
 		return grant(types.OrgRoleAdmin)
+	}
+	// A public KB is readable by every signed-in account, but only ever at
+	// Viewer level. Comparing against `required` rather than granting outright
+	// is what keeps publishing read-only: a write route asks for Editor or
+	// Admin, Viewer does not satisfy it, and the request falls through to the
+	// denial below with no extra check at the route.
+	if types.IsPublicKnowledgeBase(kb) && types.OrgRoleViewer.HasPermission(required) {
+		return grant(types.OrgRoleViewer)
 	}
 	if shares != nil {
 		permissions := NewKBSharePermissions(ctx, shares, request.Caller.TenantID, request.Caller.Role)

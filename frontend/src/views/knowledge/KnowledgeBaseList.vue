@@ -190,6 +190,18 @@
                         <span>{{ $t('knowledgeList.menu.duplicate') }}</span>
                       </div>
                       <template v-if="canManageKBCard(kb)">
+                        <!-- 可见范围：三项平铺在菜单里，当前项打勾。比进设置弹窗
+                             少一步，因为这个开关是日常动作（公开一份参考库给全平台）,
+                             而不是一次性配置。 -->
+                        <div class="popup-menu-section-title">{{ $t('knowledgeList.visibility.label') }}</div>
+                        <div v-for="opt in KB_VISIBILITY_OPTIONS" :key="opt.value" class="popup-menu-item visibility-option"
+                          :class="{ 'is-current': kbVisibilityOf(kb) === opt.value }"
+                          @click.stop="changeKbVisibility(kb, opt.value)">
+                          <t-icon class="menu-icon"
+                            :name="kbVisibilityOf(kb) === opt.value ? 'check' : opt.icon" />
+                          <span>{{ $t(opt.labelKey) }}</span>
+                        </div>
+                        <div class="popup-menu-divider"></div>
                         <div class="popup-menu-item" @click.stop="handleSettingsById(kb.id)">
                           <t-icon class="menu-icon" name="setting" />
                           <span>{{ $t('knowledgeBase.settings') }}</span>
@@ -328,10 +340,10 @@
                   </div>
                 </div>
                 <div class="bottom-right">
-                  <t-tooltip :content="kb.org_name" placement="top">
-                    <div class="org-source">
-                      <t-icon name="usergroup" class="org-source-icon" size="14px" aria-hidden="true" />
-                      <span>{{ kb.org_name }}</span>
+                  <t-tooltip :content="kb.org_name || $t('knowledgeList.visibility.publicHint')" placement="top">
+                    <div class="org-source" :class="{ 'is-public': isPublicSharedKb(kb) }">
+                      <t-icon :name="isPublicSharedKb(kb) ? 'earth' : 'usergroup'" class="org-source-icon" size="14px" aria-hidden="true" />
+                      <span>{{ kb.org_name || $t('knowledgeList.visibility.public') }}</span>
                     </div>
                   </t-tooltip>
                 </div>
@@ -421,6 +433,15 @@
                         <span>{{ $t('knowledgeList.menu.duplicate') }}</span>
                       </div>
                       <template v-if="canManageKBCard(kb)">
+                        <div class="popup-menu-section-title">{{ $t('knowledgeList.visibility.label') }}</div>
+                        <div v-for="opt in KB_VISIBILITY_OPTIONS" :key="opt.value" class="popup-menu-item visibility-option"
+                          :class="{ 'is-current': kbVisibilityOf(kb) === opt.value }"
+                          @click.stop="changeKbVisibility(kb, opt.value)">
+                          <t-icon class="menu-icon"
+                            :name="kbVisibilityOf(kb) === opt.value ? 'check' : opt.icon" />
+                          <span>{{ $t(opt.labelKey) }}</span>
+                        </div>
+                        <div class="popup-menu-divider"></div>
                         <div class="popup-menu-item" @click.stop="handleSettings(kb)">
                           <t-icon class="menu-icon" name="setting" />
                           <span>{{ $t('knowledgeBase.settings') }}</span>
@@ -718,7 +739,7 @@ import { MessagePlugin, Icon as TIcon } from 'tdesign-vue-next'
 import EmptyState from '@/components/EmptyState.vue'
 import ResourceIcon from '@/components/icons/ResourceIcon.vue'
 import { useConfirmDelete } from '@/components/settings/useConfirmDelete'
-import { deleteKnowledgeBase, duplicateKnowledgeBase, togglePinKnowledgeBase } from '@/api/knowledge-base'
+import { deleteKnowledgeBase, duplicateKnowledgeBase, togglePinKnowledgeBase, setKnowledgeBaseVisibility, type KnowledgeBaseVisibility } from '@/api/knowledge-base'
 import { useChatResourcesStore } from '@/stores/chatResources'
 import { formatStringDate } from '@/utils/index'
 import { useUIStore } from '@/stores/ui'
@@ -810,6 +831,14 @@ interface KB {
   creator_id?: string;
   // creator_name 由后端 list 接口回填，仅用于卡片右下角来源徽章的 tooltip。
   creator_name?: string;
+  // visibility 是后端新加的可见范围：private（仅自己与管理员）/ workspace
+  // （本空间，历史默认）/ public（所有用户只读）。
+  visibility?: 'private' | 'workspace' | 'public';
+  // is_foreign 表示这条记录属于别的工作区、只因公开而出现在列表里。
+  is_foreign?: boolean;
+  // permission 由后端按调用者实际权限回填（自有为 admin，公开外来的为 viewer），
+  // 避免卡片对只读资源显示编辑入口、点了才 403。
+  permission?: string;
 }
 
 const flatKnowledgeBaseSortAccessors: ResourceSortAccessors<any> = {
@@ -858,7 +887,10 @@ const spaceKbsLoading = ref(false)
 // 「工作空间」固定保持“置顶 → 我创建 → 同事创建”，用户选择只影响组内顺序。
 const unsearchedSortedMineKbs = computed<KB[]>(() => {
   return sortResourcesWithinGroups(
-    kbs.value,
+    // A KB published by another workspace arrives in this list (the backend
+    // unions public KBs into it) but is not "mine": it belongs under the
+    // shared, read-only section of the All tab instead.
+    kbs.value.filter(kb => !kb.is_foreign),
     selectedResourceSort.value,
     kb => kb.is_pinned ? 'pinned' : isMyKb(kb) ? 'mine' : 'tenantOthers',
     ['pinned', 'mine', 'tenantOthers'],
@@ -916,6 +948,23 @@ const effectiveSharedCountByOrg = computed<Record<string, number>>(() => {
 const kbResourceIndex = computed(() => {
   const map = new Map<string, { kb: any; isMine: boolean; shared?: SharedKnowledgeBase }>()
   for (const kb of kbs.value) {
+    // Public KBs published by another workspace appear in this list but are
+    // read-only; the favourites/recents views expect a share record for
+    // non-owned rows, so synthesise one instead of leaving it undefined.
+    if (kb.is_foreign) {
+      map.set(kb.id, {
+        kb,
+        isMine: false,
+        shared: {
+          knowledge_base: kb,
+          permission: 'viewer',
+          shared_at: kb.created_at ?? '',
+          share_id: `public:${kb.id}`,
+          org_name: '',
+        } as unknown as SharedKnowledgeBase,
+      })
+      continue
+    }
     map.set(kb.id, { kb, isMine: true })
   }
   for (const shared of sharedKbs.value) {
@@ -980,6 +1029,13 @@ const recentsList = computed(() => {
 const EDITABLE_PERMS = new Set(['admin', 'editor'])
 function isSharedKbEditable(perm: string | undefined): boolean {
   return !!perm && EDITABLE_PERMS.has(perm)
+}
+
+// Public KBs from another workspace are carried through the shared-list shape
+// with a synthetic share id (see the All-scope merge), which is how the card
+// knows to label its source "public" instead of an organization name.
+function isPublicSharedKb(kb: any): boolean {
+  return typeof kb?.share_id === 'string' && kb.share_id.startsWith('public:')
 }
 
 // 同空间、非当前用户创建的 KB 分组标题。
@@ -1097,9 +1153,25 @@ const unsearchedFilteredKnowledgeBases = computed(() => {
   // ≥2 entries (#795). mergeAllScopeKnowledgeBases de-duplicates by KB id
   // (owned wins; most-privileged share kept) while preserving the existing
   // pinned → mine → teammate → shared(editable-first) ordering.
+  // Public KBs from other workspaces come back in the own-KB list (one request
+  // covers both). They must not be treated as "mine": route them through the
+  // shared side so the card renders as read-only, exactly like an org share
+  // with viewer rights. Faking a share record here keeps merge/dedupe and the
+  // section grouping on a single code path.
+  const ownedForMerge = kbs.value.filter(kb => !kb.is_foreign)
+  const publicAsShared = kbs.value
+    .filter(kb => kb.is_foreign)
+    .map(kb => ({
+      knowledge_base: kb,
+      permission: 'viewer',
+      shared_at: kb.created_at ?? '',
+      share_id: `public:${kb.id}`,
+      org_name: '',
+    }))
+
   const merged = mergeAllScopeKnowledgeBases(
-    kbs.value as unknown as OwnedKnowledgeBase[],
-    sharedKbs.value as unknown as SharedKnowledgeBaseLike[],
+    ownedForMerge as unknown as OwnedKnowledgeBase[],
+    [...sharedKbs.value, ...publicAsShared] as unknown as SharedKnowledgeBaseLike[],
     authStore.user?.id,
   ) as unknown as Array<(KB & { isMine: true }) | (SharedKnowledgeBase['knowledge_base'] & { isMine: false; permission: string; shared_at: string; share_id: string } & any)>
   return sortResourcesWithinGroups(
@@ -1116,7 +1188,10 @@ const showKbListEmpty = computed(() => {
   if (loading.value || keyword.value.trim()) return false
   if (!authStore.hasRole('contributor')) return false
   if (spaceSelection.value === 'all' && filteredKnowledgeBases.value.length === 0) return true
-  if (spaceSelection.value === 'mine' && kbs.value.length === 0) return true
+  // Count only the caller's own KBs: a public KB published by another
+  // workspace is listed in kbs but filtered out of the "mine" view, and the
+  // empty state has to agree with what is actually rendered.
+  if (spaceSelection.value === 'mine' && sortedMineKbs.value.length === 0) return true
   return false
 })
 
@@ -1284,6 +1359,52 @@ function canDuplicateKBCard(kb: any): boolean {
   return authStore.hasRole('contributor') && kb.isMine !== false
 }
 
+// 可见范围选项，与后端 knowledge_bases.visibility 一一对应。顺序按受众由小
+// 到大排列，菜单照此渲染，当前项打勾。
+const KB_VISIBILITY_OPTIONS: Array<{
+  value: KnowledgeBaseVisibility
+  labelKey: string
+  icon: string
+}> = [
+  { value: 'private', labelKey: 'knowledgeList.visibility.private', icon: 'lock-on' },
+  { value: 'workspace', labelKey: 'knowledgeList.visibility.workspace', icon: 'usergroup' },
+  { value: 'public', labelKey: 'knowledgeList.visibility.publicOption', icon: 'earth' },
+]
+
+// 老数据没有 visibility 字段，后端与迁移都按 workspace 兜底；这里必须一致，
+// 否则菜单会把一个本来就全员可见的 KB 显示成「私有」。
+function kbVisibilityOf(kb: KB): KnowledgeBaseVisibility {
+  const value = (kb as any).visibility
+  return value === 'private' || value === 'public' ? value : 'workspace'
+}
+
+const visibilitySavingId = ref<string | null>(null)
+
+async function changeKbVisibility(kb: KB, next: KnowledgeBaseVisibility) {
+  if (visibilitySavingId.value === kb.id) return
+  if (kbVisibilityOf(kb) === next) {
+    openKbMenuId.value = null
+    return
+  }
+  visibilitySavingId.value = kb.id
+  try {
+    // 用接口返回值回写，不做乐观更新：把一份私有库误显示成已公开，比慢半秒更糟。
+    const res: any = await setKnowledgeBaseVisibility(kb.id, next)
+    const row = kbs.value.find(item => item.id === kb.id)
+    if (row) {
+      row.visibility = (res?.data?.visibility as KnowledgeBaseVisibility) ?? next
+    }
+    MessagePlugin.success(t('knowledgeList.visibility.saved'))
+    openKbMenuId.value = null
+    // 可见范围会影响「别人能否看到」，重新拉一次让分组与计数保持同步。
+    await fetchList(true)
+  } catch (err: any) {
+    MessagePlugin.error(err?.message || t('knowledgeList.visibility.saveFailed'))
+  } finally {
+    visibilitySavingId.value = null
+  }
+}
+
 // isMyKb 仅用于卡片右下角徽章在「我创建」与「同空间其他成员创建」之间切换。
 // 与 canManageKBCard 不同：管理权限有 admin 兜底，徽章纯粹按创建者匹配。
 // creator_id 为空（PR 5 RBAC 迁移之前的老 KB）一律按 tenant 处理——避免把
@@ -1411,6 +1532,20 @@ const openSharedDetailFromAll = (kb: any) => {
   const sharedKb = sharedKbs.value.find(s => s.knowledge_base.id === kb.id)
   if (sharedKb) {
     currentSharedKbForDetail.value = sharedKb
+    sharedDetailPanelVisible.value = true
+    return
+  }
+  // A public KB from another workspace has no share record behind it, so the
+  // lookup above misses. Show the same panel with a synthesised viewer grant
+  // rather than making the info button silently do nothing.
+  if (isPublicSharedKb(kb) || kb?.is_foreign) {
+    currentSharedKbForDetail.value = {
+      knowledge_base: kb,
+      permission: 'viewer',
+      shared_at: kb.created_at ?? '',
+      share_id: `public:${kb.id}`,
+      org_name: '',
+    } as unknown as SharedKbDetailItem
     sharedDetailPanelVisible.value = true
   }
 }

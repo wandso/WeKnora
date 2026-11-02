@@ -65,6 +65,39 @@
   gap: 1px;
 }
 
+/* Menu group caption. Carries a "which choice is active" group (visibility,
+   sort order) so the options below it read as a set instead of as actions. */
+.popup-menu-section-title {
+  padding: 6px 10px 2px;
+  font-size: var(--app-text-xs);
+  line-height: 1.4;
+  color: var(--td-text-color-placeholder);
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+
+.popup-menu-divider {
+  height: 1px;
+  margin: 4px 8px;
+  background: var(--td-component-stroke);
+}
+
+/* The active choice in a radio-style menu group: a check icon plus a tinted
+   row, so the current value is visible without reading the whole list. */
+.popup-menu-item.is-current {
+  color: var(--td-brand-color);
+  background: color-mix(in srgb, var(--td-brand-color) 8%, transparent);
+
+  .menu-icon {
+    color: var(--td-brand-color);
+  }
+
+  &:hover {
+    color: var(--td-brand-color);
+    background: color-mix(in srgb, var(--td-brand-color) 12%, transparent);
+  }
+}
+
 .popup-menu-item {
   display: flex;
   align-items: center;

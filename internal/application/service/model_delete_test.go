@@ -485,3 +485,14 @@ func (
 ) {
 	panic("unexpected UpdateTenantProfile call")
 }
+
+// Visibility support added with the public/private KB option. These stubs are
+// only used by callers that never exercise the column, so the reads stay empty
+// and the write is a no-op.
+func (s *stubKBRepoForModelDelete) ListPublicKnowledgeBases(_ context.Context, _ uint64) ([]*types.KnowledgeBase, error) {
+	return nil, nil
+}
+
+func (s *stubKBRepoForModelDelete) SetKnowledgeBaseVisibility(_ context.Context, _ uint64, _ string, _ string) error {
+	return nil
+}

@@ -242,6 +242,11 @@ func RegisterKnowledgeBaseRoutes(r *gin.RouterGroup, handler *handler.KnowledgeB
 		// 以调用者「自身」租户(c.Keys，未被 KBAccess 改写)校验 kb.TenantID，
 		// 把删除锁死为「所有者租户 + Admin」，共享 editor 无法删除源 KB。
 		kbManagement.PUT("/:id", g.OwnedKBOrAdmin(), g.KBAccessWrite("id"), handler.UpdateKnowledgeBase)
+		// 设置可见范围 — 私有/本空间/公开。只有 KB 所属空间可改，且需创建者或管理员，
+		// 因此这里只挂 KBAccessWrite（公开阅读者在该处被降为 Viewer，直接 403），
+		// 归属与角色判定在 handler/service 内完成 —— 那两处依赖调用者的「自身」租户，
+		// 而路由守卫会把执行租户改写成 KB 的源租户。
+		kbManagement.PUT("/:id/visibility", g.KBAccessWrite("id"), handler.SetKnowledgeBaseVisibility)
 		kbManagement.PATCH("/:id", g.OwnedKBOrAdmin(), g.KBAccessWrite("id"), handler.PatchKnowledgeBase)
 		// 立即重新生成知识库 AI 描述 — 与更新知识库同档鉴权；同步执行一次小模型调用。
 		kbManagement.POST("/:id/profile/generate", g.OwnedKBOrAdmin(), g.KBAccessWrite("id"),

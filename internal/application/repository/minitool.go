@@ -11,7 +11,9 @@ import (
 )
 
 // ErrMiniToolNotFound is returned when a card does not exist in the workspace.
-var ErrMiniToolNotFound = errors.New("mini tool not found")
+// Aliased to the interfaces sentinel so the service can match it without
+// importing this package.
+var ErrMiniToolNotFound = interfaces.ErrMiniToolNotFound
 
 type miniToolRepository struct {
 	db *gorm.DB
@@ -30,8 +32,12 @@ func (r *miniToolRepository) GetByID(
 	ctx context.Context, tenantID uint64, id string,
 ) (*types.MiniTool, error) {
 	var tool types.MiniTool
+	// A public card is readable from any workspace; everything else stays
+	// tenant-scoped. Write paths use Delete/Update, which filter on tenant_id
+	// alone, so reading a foreign public card never implies editing it.
 	err := r.db.WithContext(ctx).
-		Where("id = ? AND tenant_id = ?", id, tenantID).
+		Where("id = ? AND (tenant_id = ? OR visibility = ?)",
+			id, tenantID, types.MiniToolVisibilityPublic).
 		First(&tool).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrMiniToolNotFound
@@ -42,10 +48,17 @@ func (r *miniToolRepository) GetByID(
 	return &tool, nil
 }
 
+// List returns the cards visible to a workspace: its own rows plus every card
+// published as public, wherever it was created.
+//
+// "public" is the one cross-tenant read in this module, and it is narrowed to
+// the visibility column so a caller cannot reach a card that was not
+// deliberately published.
 func (r *miniToolRepository) List(
 	ctx context.Context, tenantID uint64, query types.MiniToolQuery,
 ) ([]*types.MiniTool, error) {
-	db := r.db.WithContext(ctx).Where("tenant_id = ?", tenantID)
+	db := r.db.WithContext(ctx).
+		Where("tenant_id = ? OR visibility = ?", tenantID, types.MiniToolVisibilityPublic)
 	if !query.IncludeDisabled {
 		db = db.Where("enabled = ?", true)
 	}
@@ -82,8 +95,11 @@ func (r *miniToolRepository) ListByIDs(
 		return nil, nil
 	}
 	var tools []*types.MiniTool
+	// Same audience rule as GetByID: own rows plus public ones, so a turn can
+	// inject a card another workspace published.
 	if err := r.db.WithContext(ctx).
-		Where("tenant_id = ? AND id IN ?", tenantID, ids).
+		Where("id IN ? AND (tenant_id = ? OR visibility = ?)",
+			ids, tenantID, types.MiniToolVisibilityPublic).
 		Find(&tools).Error; err != nil {
 		return nil, err
 	}

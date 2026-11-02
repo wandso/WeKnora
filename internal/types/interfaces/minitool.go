@@ -2,9 +2,16 @@ package interfaces
 
 import (
 	"context"
+	"errors"
 
 	"github.com/Tencent/WeKnora/internal/types"
 )
+
+// ErrMiniToolNotFound is returned by the catalog repository when a card does
+// not exist, is soft-deleted, or belongs to another workspace and is not
+// public. It lives here rather than in the repository package so the service
+// can translate it into a 404 without importing the storage layer.
+var ErrMiniToolNotFound = errors.New("mini tool not found")
 
 // MiniToolRepository persists the 小工具 catalog.
 //

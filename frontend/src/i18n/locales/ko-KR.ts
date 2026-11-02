@@ -6378,6 +6378,16 @@ export default {
     create: '지식베이스 생성',
     subtitle: '지식베이스를 관리하고 구성합니다. 문서형과 Q&A형 지식베이스를 지원합니다',
     sharedToOrgs: '{count} 스페이스에 공유됨',
+    visibility: {
+      label: '공개 범위',
+      private: '비공개 · 나와 관리자만',
+      workspace: '워크스페이스 · 모든 구성원',
+      publicOption: '공개 · 모든 사용자 읽기 가능',
+      public: '공개',
+      publicHint: '공개됨 — 이 배포의 모든 계정이 읽을 수 있습니다',
+      saved: '공개 범위가 업데이트되었습니다',
+      saveFailed: '공개 범위 업데이트 실패'
+    },
     uninitializedBanner: '일부 지식베이스가 아직 초기화되지 않았습니다. 지식 문서를 추가하려면 먼저 설정에서 모델 정보를 구성해야 합니다',
     features: {
       knowledgeGraph: '지식 그래프 활성화됨',
@@ -9557,6 +9567,9 @@ export default {
     disabled: '사용 안 함',
     visibilityPrivate: '나만 보기',
     visibilityWorkspace: '워크스페이스 공유',
+    visibilityPublic: '공개',
+    visibilityPublicHint: '공개하면 이 배포의 모든 계정이 이 카드를 보고 대화에서 사용할 수 있습니다. 수정·삭제는 작성자만 가능합니다.',
+    foreignBadge: '다른 워크스페이스',
     formula: '공식 / 방법',
     formulaNote: '보충 설명',
     variables: '입력 변수',

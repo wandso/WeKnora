@@ -6379,6 +6379,16 @@ export default {
     create: '新建知识库',
     subtitle: '管理和组织您的知识库，支持文档型和问答型知识库',
     sharedToOrgs: '已共享给 {count} 个空间',
+    visibility: {
+      label: '可见范围',
+      private: '私有 · 仅自己与管理员',
+      workspace: '本空间 · 所有成员',
+      publicOption: '公开 · 所有用户可读',
+      public: '公开',
+      publicHint: '已公开，其他工作区的用户可读取此知识库',
+      saved: '可见范围已更新',
+      saveFailed: '更新可见范围失败'
+    },
     uninitializedBanner: '部分知识库尚未初始化，需要先在设置中配置模型信息才能添加知识文档',
     features: {
       knowledgeGraph: '知识图谱',
@@ -9695,6 +9705,9 @@ export default {
     disabled: '已停用',
     visibilityPrivate: '仅自己',
     visibilityWorkspace: '空间共享',
+    visibilityPublic: '公开',
+    visibilityPublicHint: '公开后本部署的所有用户都能看到这张卡片，并在对话中引用它；只有你能修改或删除。',
+    foreignBadge: '来自其他空间',
     formula: '公式 / 方法',
     formulaNote: '补充说明',
     variables: '输入变量',

@@ -60,6 +60,18 @@ type KnowledgeBaseService interface {
 	// ListKnowledgeBasesByTenantID lists all knowledge bases for a specific tenant (e.g. for shared agent context).
 	ListKnowledgeBasesByTenantID(ctx context.Context, tenantID uint64) ([]*types.KnowledgeBase, error)
 
+	// SetKnowledgeBaseVisibility changes who may read a KB: private (creator +
+	// workspace admins), workspace (all members) or public (every account,
+	// read-only outside the owning workspace).
+	//
+	// callerTenantID is the caller's OWN workspace, captured before the route
+	// guard rewrites the execution tenant. It is not "the tenant that owns the
+	// KB": anyone may read a public KB, but only its own workspace may change
+	// its audience, so the check has to compare the two explicitly.
+	SetKnowledgeBaseVisibility(
+		ctx context.Context, callerTenantID uint64, id string, visibility string,
+	) (*types.KnowledgeBase, error)
+
 	// UpdateKnowledgeBase updates knowledge base information
 	// Parameters:
 	//   - ctx: Context information
@@ -208,6 +220,17 @@ type KnowledgeBaseRepository interface {
 	//   - List of knowledge base objects
 	//   - Possible errors such as database errors, etc.
 	ListKnowledgeBasesByTenantID(ctx context.Context, tenantID uint64) ([]*types.KnowledgeBase, error)
+
+	// ListPublicKnowledgeBases returns KBs published to the whole deployment,
+	// excluding excludeTenantID (the caller's own workspace, already covered by
+	// the tenant-scoped query). Deliberately cross-tenant: the only read path
+	// that ignores the tenant filter, narrowed to visibility='public'.
+	ListPublicKnowledgeBases(ctx context.Context, excludeTenantID uint64) ([]*types.KnowledgeBase, error)
+
+	// SetKnowledgeBaseVisibility writes the visibility column only, scoped to
+	// the owning tenant. Column-scoped on purpose: a full-row save would
+	// clobber a concurrent settings edit with a stale copy.
+	SetKnowledgeBaseVisibility(ctx context.Context, tenantID uint64, id string, visibility string) error
 
 	// UpdateKnowledgeBase updates a knowledge base record
 	// Parameters:

@@ -9,6 +9,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -74,6 +75,18 @@ func (s *miniToolService) ensureBuiltins(ctx context.Context, tenantID uint64) {
 		tenantID, len(cards), len(cards), created)
 }
 
+// miniToolLookupError turns the repository's sentinel into a 404.
+//
+// Without this a card that was already deleted, or that belongs to another
+// workspace and is not public, surfaced as a 500: the handler only recognises
+// *AppError, and a bare repository error falls through to the generic branch.
+func miniToolLookupError(err error) error {
+	if errors.Is(err, interfaces.ErrMiniToolNotFound) {
+		return apperrors.NewNotFoundError("mini tool not found")
+	}
+	return err
+}
+
 func (s *miniToolService) caller(ctx context.Context) (uint64, string, types.TenantRole, error) {
 	tenantID, ok := types.TenantIDFromContext(ctx)
 	if !ok || tenantID == 0 {
@@ -83,8 +96,17 @@ func (s *miniToolService) caller(ctx context.Context) (uint64, string, types.Ten
 	return tenantID, userID, types.TenantRoleFromContext(ctx), nil
 }
 
-func canManageMiniTool(tool *types.MiniTool, userID string, role types.TenantRole) bool {
+// canManageMiniTool reports whether the caller may edit or delete a card.
+//
+// tenantID is the caller's workspace and is checked first: a public card is
+// readable from anywhere, so without this a reader who happens to be Owner of
+// their own workspace would pass the role test below and be handed write access
+// to somebody else's card. Write access follows the owning workspace, always.
+func canManageMiniTool(tool *types.MiniTool, tenantID uint64, userID string, role types.TenantRole) bool {
 	if tool == nil {
+		return false
+	}
+	if tenantID == 0 || tool.TenantID != tenantID {
 		return false
 	}
 	// A shipped card has no owner. It is a shared preset that the seeder
@@ -100,24 +122,39 @@ func canManageMiniTool(tool *types.MiniTool, userID string, role types.TenantRol
 	return userID != "" && tool.OwnerUserID == userID
 }
 
-func canReadMiniTool(tool *types.MiniTool, userID string, role types.TenantRole) bool {
+func canReadMiniTool(tool *types.MiniTool, tenantID uint64, userID string, role types.TenantRole) bool {
 	if tool == nil {
 		return false
 	}
-	if tool.Visibility == types.MiniToolVisibilityWorkspace {
+	// Public cards are readable from any workspace — the only cross-tenant read
+	// in this module; see the repository's List/GetByID. Workspace cards are
+	// readable by members of the owning workspace and nobody else: the
+	// repository already filters for that, but encoding it here as well keeps
+	// the rule true if that query ever changes.
+	switch tool.Visibility {
+	case types.MiniToolVisibilityPublic:
 		return true
+	case types.MiniToolVisibilityWorkspace:
+		return tenantID != 0 && tool.TenantID == tenantID
 	}
-	return canManageMiniTool(tool, userID, role)
+	return canManageMiniTool(tool, tenantID, userID, role)
 }
 
 // decorate fills the per-request permission flags the UI renders.
-func decorateMiniTool(tool *types.MiniTool, userID string, role types.TenantRole) {
+func decorateMiniTool(tool *types.MiniTool, tenantID uint64, userID string, role types.TenantRole) {
 	if tool == nil {
 		return
 	}
-	manage := canManageMiniTool(tool, userID, role)
+	manage := canManageMiniTool(tool, tenantID, userID, role)
 	tool.CanEdit = manage
 	tool.CanDelete = manage
+	tool.IsForeign = tenantID != 0 && tool.TenantID != tenantID
+	// A published card owned by somebody else is readable but never editable,
+	// even for a workspace admin: write access follows the owning workspace.
+	if tool.IsForeign {
+		tool.CanEdit = false
+		tool.CanDelete = false
+	}
 }
 
 func (s *miniToolService) List(
@@ -140,10 +177,10 @@ func (s *miniToolService) List(
 		if query.Scope == "workspace" && tool.Visibility != types.MiniToolVisibilityWorkspace {
 			continue
 		}
-		if !canReadMiniTool(tool, userID, role) {
+		if !canReadMiniTool(tool, tenantID, userID, role) {
 			continue
 		}
-		decorateMiniTool(tool, userID, role)
+		decorateMiniTool(tool, tenantID, userID, role)
 		out = append(out, tool)
 	}
 	return out, nil
@@ -177,21 +214,21 @@ func (s *miniToolService) Get(ctx context.Context, id string) (*types.MiniTool, 
 	}
 	tool, err := s.repo.GetByID(ctx, tenantID, id)
 	if err != nil {
-		return nil, err
+		return nil, miniToolLookupError(err)
 	}
-	if !canReadMiniTool(tool, userID, role) {
+	if !canReadMiniTool(tool, tenantID, userID, role) {
 		// A private card of another member is indistinguishable from a missing
 		// one, so an id probe learns nothing.
 		return nil, apperrors.NewNotFoundError("mini tool not found")
 	}
-	decorateMiniTool(tool, userID, role)
+	decorateMiniTool(tool, tenantID, userID, role)
 	return tool, nil
 }
 
 func (s *miniToolService) Create(
 	ctx context.Context, tool *types.MiniTool,
 ) (*types.MiniTool, error) {
-	tenantID, userID, _, err := s.caller(ctx)
+	tenantID, userID, role, err := s.caller(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -203,6 +240,12 @@ func (s *miniToolService) Create(
 	tool.OwnerUserID = userID
 	tool.Enabled = true
 	tool.UsageCount = 0
+	// Computed per request, never stored. Cleared here so a caller that posts
+	// them (or a duplicate that copied them) cannot smuggle a read-only flag or
+	// a false "foreign" origin into the response for a card it now owns.
+	tool.CanEdit = false
+	tool.CanDelete = false
+	tool.IsForeign = false
 	tool.Normalize()
 	if err := tool.Validate(); err != nil {
 		return nil, apperrors.NewValidationError(err.Error())
@@ -211,6 +254,10 @@ func (s *miniToolService) Create(
 		return nil, fmt.Errorf("create mini tool: %w", err)
 	}
 	logger.Infof(ctx, "Mini tool created: id=%s category=%s", tool.ID, tool.Category)
+	// Decorate before returning: the editor re-renders straight from this
+	// response, and an undecorated card would show up as read-only to its own
+	// author until the next list fetch.
+	decorateMiniTool(tool, tenantID, userID, role)
 	return tool, nil
 }
 
@@ -223,9 +270,9 @@ func (s *miniToolService) Update(
 	}
 	tool, err := s.repo.GetByID(ctx, tenantID, id)
 	if err != nil {
-		return nil, err
+		return nil, miniToolLookupError(err)
 	}
-	if !canManageMiniTool(tool, userID, role) {
+	if !canManageMiniTool(tool, tenantID, userID, role) {
 		return nil, apperrors.NewForbiddenError("you cannot edit this mini tool")
 	}
 	applyMiniToolPatch(tool, patch)
@@ -236,7 +283,7 @@ func (s *miniToolService) Update(
 	if err := s.repo.Update(ctx, tool); err != nil {
 		return nil, fmt.Errorf("update mini tool: %w", err)
 	}
-	decorateMiniTool(tool, userID, role)
+	decorateMiniTool(tool, tenantID, userID, role)
 	return tool, nil
 }
 
@@ -283,12 +330,12 @@ func (s *miniToolService) Delete(ctx context.Context, id string) error {
 	}
 	tool, err := s.repo.GetByID(ctx, tenantID, id)
 	if err != nil {
-		return err
+		return miniToolLookupError(err)
 	}
-	if !canManageMiniTool(tool, userID, role) {
+	if !canManageMiniTool(tool, tenantID, userID, role) {
 		return apperrors.NewForbiddenError("you cannot delete this mini tool")
 	}
-	return s.repo.Delete(ctx, tenantID, id)
+	return miniToolLookupError(s.repo.Delete(ctx, tenantID, id))
 }
 
 func (s *miniToolService) Duplicate(
@@ -305,6 +352,12 @@ func (s *miniToolService) Duplicate(
 	// publish the copy to everyone.
 	copyTool.Visibility = types.MiniToolVisibilityPrivate
 	copyTool.UsageCount = 0
+	// The permission flags describe the SOURCE row relative to the caller.
+	// Carrying them into the copy made a fork of somebody else's public card
+	// come back as "foreign, read-only" even though the caller now owns it.
+	copyTool.IsForeign = false
+	copyTool.CanEdit = false
+	copyTool.CanDelete = false
 	return s.Create(ctx, &copyTool)
 }
 
@@ -359,7 +412,7 @@ func (s *miniToolService) ListForRun(
 		if tool == nil || !tool.Enabled {
 			continue
 		}
-		if !canReadMiniTool(tool, userID, role) {
+		if !canReadMiniTool(tool, tenantID, userID, role) {
 			continue
 		}
 		if _, dup := seen[tool.ID]; dup {

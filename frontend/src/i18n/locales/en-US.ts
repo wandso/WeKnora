@@ -1504,6 +1504,9 @@ export default {
     disabled: 'Disabled',
     visibilityPrivate: 'Only me',
     visibilityWorkspace: 'Workspace',
+    visibilityPublic: 'Public',
+    visibilityPublicHint: 'Public cards are visible to every account on this deployment and can be attached in their chats. Only you can edit or delete it.',
+    foreignBadge: 'From another workspace',
     formula: 'Formula / method',
     formulaNote: 'Notes',
     variables: 'Inputs',
@@ -3732,6 +3735,16 @@ export default {
     create: 'Create Knowledge Base',
     subtitle: 'Manage and organize your knowledge bases, supporting document-based and FAQ-based knowledge bases',
     sharedToOrgs: 'Shared to {count} space(s)',
+    visibility: {
+      label: 'Who can read this',
+      private: 'Private · me and admins',
+      workspace: 'Workspace · all members',
+      publicOption: 'Public · everyone can read',
+      public: 'Public',
+      publicHint: 'Published — every account on this deployment can read this knowledge base',
+      saved: 'Visibility updated',
+      saveFailed: 'Failed to update visibility'
+    },
     uninitializedBanner: 'Some knowledge bases are not initialized. Configure model information in settings before adding documents.',
     empty: {
       title: 'No knowledge bases yet',

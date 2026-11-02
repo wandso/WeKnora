@@ -379,6 +379,19 @@ export function getKnowledgeBaseById(id: string, options?: { agent_id?: string; 
   return get(qs ? `/api/v1/knowledge-bases/${id}?${qs}` : `/api/v1/knowledge-bases/${id}`);
 }
 
+export type KnowledgeBaseVisibility = 'private' | 'workspace' | 'public';
+
+/**
+ * Change who may read a knowledge base.
+ *
+ * Only the owning workspace may call this; everybody else gets a 403. Publishing
+ * is read-only outside the owner, so the UI must not offer write actions on a
+ * public KB it does not own.
+ */
+export function setKnowledgeBaseVisibility(id: string, visibility: KnowledgeBaseVisibility) {
+  return put(`/api/v1/knowledge-bases/${id}/visibility`, { visibility });
+}
+
 export function updateKnowledgeBase(id: string, data: {
   name: string;
   description?: string;

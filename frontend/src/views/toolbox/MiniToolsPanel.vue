@@ -50,8 +50,12 @@
               <h3 class="tool-card__title" :title="tool.name">{{ tool.name }}</h3>
               <div class="tool-card__meta">
                 <span class="tool-card__category">{{ tool.category }}</span>
-                <span v-if="tool.visibility === 'workspace'" class="tool-card__visibility">
-                  {{ $t('miniTools.visibilityWorkspace') }}
+                <span v-if="tool.visibility !== 'private'" class="tool-card__visibility"
+                  :class="{ 'tool-card__visibility--public': tool.visibility === 'public' }">
+                  {{ visibilityLabel(tool) }}
+                </span>
+                <span v-if="tool.is_foreign" class="tool-card__visibility tool-card__visibility--foreign">
+                  {{ $t('miniTools.foreignBadge') }}
                 </span>
                 <span v-if="!tool.enabled" class="tool-card__disabled">{{ $t('miniTools.disabled') }}</span>
               </div>
@@ -90,7 +94,10 @@
         <div class="detail__badges">
           <span class="detail__badge">{{ detail.category }}</span>
           <span class="detail__badge detail__badge--muted">
-            {{ detail.visibility === 'workspace' ? $t('miniTools.visibilityWorkspace') : $t('miniTools.visibilityPrivate') }}
+            {{ visibilityLabel(detail) }}
+          </span>
+          <span v-if="detail.is_foreign" class="detail__badge detail__badge--muted">
+            {{ $t('miniTools.foreignBadge') }}
           </span>
           <span v-if="!detail.enabled" class="detail__badge detail__badge--warn">{{ $t('miniTools.disabled') }}</span>
         </div>
@@ -236,6 +243,7 @@
             <t-radio-group v-model="form.visibility">
               <t-radio value="private">{{ $t('miniTools.visibilityPrivate') }}</t-radio>
               <t-radio value="workspace">{{ $t('miniTools.visibilityWorkspace') }}</t-radio>
+              <t-radio value="public">{{ $t('miniTools.visibilityPublic') }}</t-radio>
             </t-radio-group>
           </label>
           <label class="editor__inline">
@@ -243,6 +251,12 @@
             <t-switch v-model="form.enabled" />
           </label>
         </div>
+        <!-- Publishing a card to the whole deployment is not reversible by the
+             reader, so the consequence is spelled out at the moment of choice
+             rather than in a tooltip. -->
+        <p v-if="form.visibility === 'public'" class="editor__hint">
+          {{ $t('miniTools.visibilityPublicHint') }}
+        </p>
       </div>
     </t-dialog>
   </div>
@@ -272,6 +286,14 @@ const authStore = useAuthStore()
 // Reads are open to every member; creating a card needs Contributor, which is
 // the same bar the backend route guard enforces.
 const canCreate = computed(() => authStore.hasRole('contributor'))
+
+// Label for the audience a card is published to. Kept in one place because the
+// same wording appears on the card badge, the detail sheet and the editor.
+function visibilityLabel(tool: Pick<MiniTool, 'visibility'>): string {
+  if (tool.visibility === 'public') return t('miniTools.visibilityPublic')
+  if (tool.visibility === 'workspace') return t('miniTools.visibilityWorkspace')
+  return t('miniTools.visibilityPrivate')
+}
 
 const loading = ref(true)
 const saving = ref(false)
@@ -595,6 +617,21 @@ defineExpose({ openAdd: openCreate })
   background: color-mix(in srgb, var(--td-brand-color) 10%, transparent);
 }
 
+/* A card published to the whole deployment outranks a workspace preset, so it
+   gets a filled badge rather than the same tint every other chip uses. */
+.tool-card__visibility--public {
+  color: var(--td-text-color-anti);
+  background: var(--td-brand-color);
+}
+
+/* A card owned by another workspace: readable, never editable. Muted so it
+   reads as provenance instead of status. */
+.tool-card__visibility--foreign {
+  color: var(--td-text-color-secondary);
+  background: transparent;
+  border: 1px dashed var(--td-component-stroke);
+}
+
 .tool-card__disabled {
   color: var(--td-error-color);
   background: color-mix(in srgb, var(--td-error-color) 10%, transparent);
@@ -821,6 +858,16 @@ defineExpose({ openAdd: openCreate })
   gap: 10px;
   font-size: var(--app-text-sm);
   color: var(--td-text-color-secondary);
+}
+
+.editor__hint {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--app-radius-sm);
+  font-size: var(--app-text-sm);
+  line-height: 1.5;
+  color: var(--td-text-color-secondary);
+  background: color-mix(in srgb, var(--td-warning-color) 10%, transparent);
 }
 
 .editor__section {

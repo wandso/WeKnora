@@ -379,57 +379,60 @@ func (s *knowledgeBaseService) GetKnowledgeBasesByIDsOnly(ctx context.Context, i
 	return kbs, nil
 }
 
-// ListKnowledgeBases returns all knowledge bases for a tenant
+// ListKnowledgeBases returns all knowledge bases the caller may see: their own
+// workspace's KBs (minus other members' private ones) plus every KB published
+// as public on this deployment.
 func (s *knowledgeBaseService) ListKnowledgeBases(ctx context.Context) ([]*types.KnowledgeBase, error) {
 	tenantID := types.MustTenantIDFromContext(ctx)
+	caller := callerForKBPermission(ctx, tenantID)
 
 	kbs, err := s.repo.ListKnowledgeBasesByTenantID(ctx, tenantID)
 	if err != nil {
-		for _, kb := range kbs {
-			kb.EnsureDefaults()
-		}
-
 		logger.ErrorWithFields(ctx, err, map[string]interface{}{
 			"tenant_id": tenantID,
 		})
 		return nil, err
 	}
 
-	// Query knowledge count and chunk count for each knowledge base
+	// Visibility inside the caller's own workspace. A private KB belongs to its
+	// creator and to the workspace Owner/Admin; everybody else must not even
+	// learn that it exists, so it is dropped before enrichment.
+	visible := make([]*types.KnowledgeBase, 0, len(kbs))
 	for _, kb := range kbs {
 		kb.EnsureDefaults()
-
-		// Get knowledge count
-		switch kb.Type {
-		case types.KnowledgeBaseTypeDocument:
-			knowledgeCount, err := s.kgRepo.CountKnowledgeByKnowledgeBaseID(ctx, tenantID, kb.ID)
-			if err != nil {
-				logger.Warnf(ctx, "Failed to get knowledge count for knowledge base %s: %v", kb.ID, err)
-			} else {
-				kb.KnowledgeCount = knowledgeCount
-			}
-		case types.KnowledgeBaseTypeFAQ:
-			// Get chunk count
-			chunkCount, err := s.chunkRepo.CountChunksByKnowledgeBaseID(ctx, tenantID, kb.ID)
-			if err != nil {
-				logger.Warnf(ctx, "Failed to get chunk count for knowledge base %s: %v", kb.ID, err)
-			} else {
-				kb.ChunkCount = chunkCount
-			}
+		if kb.Visibility == types.KnowledgeBaseVisibilityPrivate &&
+			!canReadPrivateKnowledgeBase(kb, caller) {
+			continue
 		}
+		kb.IsForeign = false
+		// Permission is left empty for own KBs on purpose: the UI already
+		// derives edit rights from creator_id + tenant role, and stamping
+		// "admin" here would light up Settings/Delete for a Contributor who
+		// merely shares the workspace with the KB.
+		kb.Permission = ""
+		visible = append(visible, kb)
+	}
 
-		// Check if there is a processing import task
-		processingCount, err := s.kgRepo.CountKnowledgeByStatus(
-			ctx,
-			tenantID,
-			kb.ID,
-			[]string{"pending", "processing"},
-		)
-		if err != nil {
-			logger.Warnf(ctx, "Failed to check processing status for knowledge base %s: %v", kb.ID, err)
-		} else {
-			kb.IsProcessing = processingCount > 0
-			kb.ProcessingCount = processingCount
+	// Public KBs from other workspaces. Best-effort: a failure here must not
+	// take down the caller's own list, which is the primary content.
+	if publicKBs, err := s.repo.ListPublicKnowledgeBases(ctx, tenantID); err != nil {
+		logger.Warnf(ctx, "Failed to list public knowledge bases for tenant %d: %v", tenantID, err)
+	} else {
+		for _, kb := range publicKBs {
+			kb.EnsureDefaults()
+			// Read-only: the resolver hands foreign callers Viewer, so the UI
+			// must not offer edit affordances it knows will be refused.
+			kb.Permission = string(types.OrgRoleViewer)
+			kb.IsForeign = true
+			visible = append(visible, kb)
+		}
+	}
+
+	// Counts are keyed on each KB's own tenant, not the caller's: a public KB
+	// from another workspace would otherwise report zero documents.
+	for _, kb := range visible {
+		if err := s.FillKnowledgeBaseCounts(ctx, kb); err != nil {
+			logger.Warnf(ctx, "Failed to fill counts for knowledge base %s: %v", kb.ID, err)
 		}
 	}
 
@@ -438,9 +441,89 @@ func (s *knowledgeBaseService) ListKnowledgeBases(ctx context.Context) ([]*types
 	// agent/share/IM callers go through ListKnowledgeBasesByTenantID
 	// which also enriches but keys off the user in their own context.
 	if userID, ok := types.UserIDFromContext(ctx); ok && userID != "" {
-		s.applyUserKBPins(ctx, tenantID, userID, kbs)
+		s.applyUserKBPins(ctx, tenantID, userID, visible)
 	}
-	return kbs, nil
+	return visible, nil
+}
+
+// callerForKBPermission reconstructs the caller identity from the request
+// context. It exists because the visibility rules are expressed against the
+// same (tenant, user, role) triple the access resolver uses, and the list path
+// has no resolver of its own.
+func callerForKBPermission(ctx context.Context, tenantID uint64) types.Caller {
+	caller := types.CallerFromContext(ctx)
+	// The list query is scoped to tenantID; keep the identity aligned with it
+	// so a rewritten execution tenant cannot widen the private-KB filter.
+	caller.TenantID = tenantID
+	return caller.Normalize()
+}
+
+// canReadPrivateKnowledgeBase reports whether the caller may see a KB marked
+// private inside its own workspace: the creator, or a workspace Owner/Admin.
+//
+// A KB created before the visibility column existed can carry an empty
+// CreatorID (rows from the API-key era, or created by a synthetic user). Those
+// stay visible to the workspace: there is no creator to attribute them to, and
+// hiding them would remove data nobody chose to hide.
+func canReadPrivateKnowledgeBase(kb *types.KnowledgeBase, caller types.Caller) bool {
+	if kb == nil {
+		return false
+	}
+	if caller.Role == types.TenantRoleOwner || caller.Role == types.TenantRoleAdmin {
+		return true
+	}
+	if kb.CreatorID == "" {
+		return true
+	}
+	return caller.UserID != "" && kb.CreatorID == caller.UserID
+}
+
+// SetKnowledgeBaseVisibility changes who may read a KB.
+//
+// Only the workspace that owns the KB may move it between levels. Publishing is
+// therefore one-directional control: a reader in another workspace can see a
+// public KB, but cannot unpublish it, because callerTenantID is captured before
+// the route guard rewrites the execution tenant to the KB's source workspace.
+func (s *knowledgeBaseService) SetKnowledgeBaseVisibility(
+	ctx context.Context, callerTenantID uint64, id string, visibility string,
+) (*types.KnowledgeBase, error) {
+	if callerTenantID == 0 {
+		return nil, apperrors.NewUnauthorizedError("a workspace is required")
+	}
+	if id == "" {
+		return nil, apperrors.NewValidationError("knowledge base id is required")
+	}
+	// Load without a tenant filter: a caller may legitimately reach a public KB
+	// through a rewritten execution tenant, and the ownership check below is
+	// what decides whether the request is allowed.
+	kb, err := s.repo.GetKnowledgeBaseByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if kb == nil {
+		return nil, apperrors.NewNotFoundError("knowledge base not found")
+	}
+	if kb.TenantID != callerTenantID {
+		return nil, apperrors.NewForbiddenError("only the owning workspace can change a knowledge base's visibility")
+	}
+	caller := callerForKBPermission(ctx, callerTenantID)
+	if caller.Role != types.TenantRoleOwner && caller.Role != types.TenantRoleAdmin &&
+		(kb.CreatorID == "" || kb.CreatorID != caller.UserID) {
+		return nil, apperrors.NewForbiddenError("only the creator or a workspace admin can change visibility")
+	}
+
+	next := types.NormalizeKnowledgeBaseVisibility(visibility)
+	if strings.TrimSpace(visibility) == "" {
+		return nil, apperrors.NewValidationError("visibility is required")
+	}
+	if err := s.repo.SetKnowledgeBaseVisibility(ctx, callerTenantID, id, next); err != nil {
+		return nil, err
+	}
+	kb.Visibility = next
+	kb.EnsureDefaults()
+	kb.Permission = string(types.OrgRoleAdmin)
+	logger.Infof(ctx, "Knowledge base %s visibility set to %s by tenant %d", id, next, callerTenantID)
+	return kb, nil
 }
 
 // ListKnowledgeBasesByTenantID returns all knowledge bases for the given tenant (e.g. for shared agent context).

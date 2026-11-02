@@ -1504,6 +1504,9 @@ export default {
     disabled: '無効',
     visibilityPrivate: '自分のみ',
     visibilityWorkspace: 'ワークスペース共有',
+    visibilityPublic: '公開',
+    visibilityPublicHint: '公開すると、この環境のすべてのアカウントがこのカードを閲覧し、会話で利用できます。編集・削除は作成者のみ可能です。',
+    foreignBadge: '別のワークスペースから',
     formula: '計算式 / 手順',
     formulaNote: '補足',
     variables: '入力変数',
@@ -3593,6 +3596,16 @@ export default {
     create: 'ナレッジベースを作成',
     subtitle: 'ナレッジベースを管理・整理します。ドキュメント型とFAQ型のナレッジベースに対応しています',
     sharedToOrgs: '{count}件の共有スペースに共有中',
+    visibility: {
+      label: '公開範囲',
+      private: '非公開 · 自分と管理者のみ',
+      workspace: 'ワークスペース · 全メンバー',
+      publicOption: '公開 · 全ユーザーが閲覧可能',
+      public: '公開',
+      publicHint: '公開済み — この環境のすべてのアカウントが閲覧できます',
+      saved: '公開範囲を更新しました',
+      saveFailed: '公開範囲の更新に失敗しました'
+    },
     uninitializedBanner: '一部のナレッジベースが初期化されていません。ドキュメントを追加する前に、設定でモデル情報を設定してください。',
     empty: {
       title: 'ナレッジベースがまだありません',

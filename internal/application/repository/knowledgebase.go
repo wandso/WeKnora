@@ -91,6 +91,27 @@ func (r *knowledgeBaseRepository) ListKnowledgeBasesByTenantID(
 	return kbs, nil
 }
 
+// ListPublicKnowledgeBases returns every KB published for the whole
+// deployment, excluding the caller's own workspace (those are already returned
+// by the tenant-scoped query, and duplicating them would break the list's
+// :key="kb.id" uniqueness).
+//
+// Cross-tenant by design: this is the one read path that intentionally ignores
+// the tenant filter, and it is narrowed to `visibility = 'public'` so a caller
+// cannot reach anything that was not deliberately published.
+func (r *knowledgeBaseRepository) ListPublicKnowledgeBases(
+	ctx context.Context, excludeTenantID uint64,
+) ([]*types.KnowledgeBase, error) {
+	var kbs []*types.KnowledgeBase
+	if err := r.db.WithContext(ctx).
+		Where("visibility = ? AND tenant_id <> ? AND is_temporary = ?",
+			types.KnowledgeBaseVisibilityPublic, excludeTenantID, false).
+		Order("created_at DESC").Find(&kbs).Error; err != nil {
+		return nil, err
+	}
+	return kbs, nil
+}
+
 // userKBPinRow mirrors the user_kb_pins table. Kept local to the
 // repository because it never escapes the package; callers see the
 // higher-level map[kb_id]pinned_at returned by ListUserKBPinIDs.
@@ -191,6 +212,30 @@ func (r *knowledgeBaseRepository) UpdateKnowledgeBaseGeneratedProfile(
 			"generated_profile": value,
 			"updated_at":        time.Now(),
 		}).Error
+}
+
+// SetKnowledgeBaseVisibility writes the visibility column only.
+//
+// A column-scoped update rather than Save(kb): publishing a KB is a single
+// toggle in the UI, and reloading-then-saving the whole row would clobber a
+// concurrent settings save (chunking, model bindings) with the stale copy this
+// request happened to read.
+func (r *knowledgeBaseRepository) SetKnowledgeBaseVisibility(
+	ctx context.Context, tenantID uint64, id string, visibility string,
+) error {
+	result := r.db.WithContext(ctx).Model(&types.KnowledgeBase{}).
+		Where("id = ? AND tenant_id = ?", id, tenantID).
+		Updates(map[string]interface{}{
+			"visibility": visibility,
+			"updated_at": time.Now(),
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrKnowledgeBaseNotFound
+	}
+	return nil
 }
 
 // DeleteKnowledgeBase deletes a knowledge base

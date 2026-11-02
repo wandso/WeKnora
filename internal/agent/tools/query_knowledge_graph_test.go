@@ -251,3 +251,9 @@ func TestQueryKnowledgeGraph_WorkerPanicIsContained(t *testing.T) {
 	require.Len(t, errs, 1)
 	require.Contains(t, errs[0], errGraphQueryPanicked.Error())
 }
+
+// Visibility support added with the public/private KB option; unused by this
+// stub's callers.
+func (s *stubKnowledgeBaseService) SetKnowledgeBaseVisibility(_ context.Context, _ uint64, _ string, _ string) (*types.KnowledgeBase, error) {
+	return nil, nil
+}

@@ -35,6 +35,46 @@ const (
 	KnowledgeBaseTypeWiki     = "wiki"
 )
 
+// Knowledge base visibility levels, ordered by audience size.
+//
+// A knowledge base was previously reachable only from inside its own workspace
+// (plus explicit organization shares). Publishing a reference corpus to every
+// account on the deployment needed an organization, an invite and a share row
+// per KB, which is far more ceremony than "make this readable by everyone".
+const (
+	// KnowledgeBaseVisibilityPrivate limits the KB to its creator and the
+	// owning workspace's Owner/Admin — the same rule mini tools use.
+	KnowledgeBaseVisibilityPrivate = "private"
+	// KnowledgeBaseVisibilityWorkspace is the historical behaviour and the
+	// default: every member of the owning workspace, and nobody else.
+	KnowledgeBaseVisibilityWorkspace = "workspace"
+	// KnowledgeBaseVisibilityPublic opens read access to every signed-in
+	// account. It is read-only outside the owning workspace by design: one
+	// published copy, one set of editors.
+	KnowledgeBaseVisibilityPublic = "public"
+)
+
+// NormalizeKnowledgeBaseVisibility maps arbitrary input onto a known level.
+// Unknown values fall back to workspace rather than public: a typo must never
+// widen the audience, and workspace is what every pre-existing row already was.
+func NormalizeKnowledgeBaseVisibility(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case KnowledgeBaseVisibilityPrivate:
+		return KnowledgeBaseVisibilityPrivate
+	case KnowledgeBaseVisibilityPublic:
+		return KnowledgeBaseVisibilityPublic
+	case KnowledgeBaseVisibilityWorkspace:
+		return KnowledgeBaseVisibilityWorkspace
+	default:
+		return KnowledgeBaseVisibilityWorkspace
+	}
+}
+
+// IsPublicKnowledgeBase reports whether a KB is readable by every account.
+func IsPublicKnowledgeBase(kb *KnowledgeBase) bool {
+	return kb != nil && NormalizeKnowledgeBaseVisibility(kb.Visibility) == KnowledgeBaseVisibilityPublic
+}
+
 // FAQIndexMode represents the FAQ index mode: only index questions or index questions and answers
 type FAQIndexMode string
 
@@ -75,6 +115,11 @@ type KnowledgeBase struct {
 	// Nullable for backward compatibility with rows created before the
 	// RBAC migration backfilled the column to the workspace Owner.
 	CreatorID string `yaml:"creator_id"              json:"creator_id"              gorm:"type:varchar(36);index"`
+	// Visibility controls who may read this knowledge base:
+	// private (creator + workspace admins), workspace (all members, default) or
+	// public (every signed-in account, read-only outside the owning workspace).
+	// Writes always stay with the owning workspace regardless of this value.
+	Visibility string `yaml:"visibility"              json:"visibility"              gorm:"type:varchar(16);not null;default:'workspace'"`
 	// Chunking configuration
 	ChunkingConfig ChunkingConfig `yaml:"chunking_config"         json:"chunking_config"         gorm:"type:json" extensions:"x-agent,x-agent-detail"`
 	// Image processing configuration
@@ -154,6 +199,15 @@ type KnowledgeBase struct {
 	// 仅在列表场景由 handler 批量回填，不落库；为空表示创建者无法解析（用户已删除、
 	// CreatorID 为空的老数据等）。前端用它在卡片来源徽章上做 mine vs workspace 的二分。
 	CreatorName string `yaml:"-"                       json:"creator_name,omitempty"  gorm:"-"`
+	// Permission is the effective access level the caller holds on this KB and
+	// is only stamped by the list endpoint. It exists so the UI can tell a
+	// public KB published by another workspace (viewer, read-only) from one the
+	// caller may edit: without it every listed card looked editable, and the
+	// 403 only arrived after a click.
+	Permission string `yaml:"-"                       json:"permission,omitempty"    gorm:"-"`
+	// IsForeign marks a row that belongs to another workspace and is visible
+	// only because it is public. The UI groups these separately from "mine".
+	IsForeign bool `yaml:"-"                       json:"is_foreign"             gorm:"-"`
 }
 
 // KnowledgeBaseConfig represents the knowledge base configuration
@@ -886,6 +940,9 @@ func (kb *KnowledgeBase) EnsureDefaults() {
 	if kb.Type == "" {
 		kb.Type = KnowledgeBaseTypeDocument
 	}
+	// Normalised before the FAQ branch below, which returns early on a first
+	// visit and would otherwise leave an empty visibility in the response.
+	kb.Visibility = NormalizeKnowledgeBaseVisibility(kb.Visibility)
 	// Clear type-specific configs that don't belong
 	if kb.Type != KnowledgeBaseTypeFAQ {
 		kb.FAQConfig = nil

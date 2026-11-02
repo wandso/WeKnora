@@ -11,13 +11,29 @@ import (
 )
 
 // Mini tool visibility. A private tool belongs to its creator; a workspace
-// tool is readable by every member of the tenant. Write access is always
-// limited to the creator (and workspace admins), never to the whole tenant:
+// tool is readable by every member of the tenant; a public tool is readable by
+// every account on the deployment. Write access is always limited to the
+// creator (and workspace admins), never to the whole tenant or the deployment:
 // a shared card is a preset, not a shared document.
 const (
 	MiniToolVisibilityPrivate   = "private"
 	MiniToolVisibilityWorkspace = "workspace"
+	// MiniToolVisibilityPublic publishes a card to every workspace. It exists
+	// because the alternative — seed a copy into each workspace — meant 108
+	// duplicate rows per tenant and no way to correct a formula once for
+	// everybody.
+	MiniToolVisibilityPublic = "public"
 )
+
+// MiniToolVisibilityValues lists every accepted value, in the order the UI
+// offers them (narrowest audience first).
+func MiniToolVisibilityValues() []string {
+	return []string{
+		MiniToolVisibilityPrivate,
+		MiniToolVisibilityWorkspace,
+		MiniToolVisibilityPublic,
+	}
+}
 
 // Mini tool selection modes, mirroring the skills / MCP vocabulary so the
 // agent editor can reuse one control for all three resource types.
@@ -157,6 +173,10 @@ type MiniTool struct {
 	// CanEdit / CanDelete are computed per request from the caller's role.
 	CanEdit   bool `json:"can_edit" gorm:"-"`
 	CanDelete bool `json:"can_delete" gorm:"-"`
+	// IsForeign marks a card that belongs to another workspace and is visible
+	// only because it is public. The UI uses it to hide edit affordances and
+	// label the card with its origin instead of pretending it is local.
+	IsForeign bool `json:"is_foreign" gorm:"-"`
 }
 
 // TableName returns the table name for MiniTool.
@@ -177,7 +197,7 @@ func (t *MiniTool) Normalize() {
 	t.FormulaNote = strings.TrimSpace(t.FormulaNote)
 	t.Knowledge = strings.TrimSpace(t.Knowledge)
 	switch t.Visibility {
-	case MiniToolVisibilityWorkspace:
+	case MiniToolVisibilityWorkspace, MiniToolVisibilityPublic:
 	default:
 		t.Visibility = MiniToolVisibilityPrivate
 	}

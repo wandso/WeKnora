@@ -934,6 +934,58 @@ func (h *KnowledgeBaseHandler) UpdateKnowledgeBase(c *gin.Context) {
 	})
 }
 
+// SetKnowledgeBaseVisibilityRequest carries the new audience for a knowledge
+// base. Only the owning workspace may send it; see the service method.
+type SetKnowledgeBaseVisibilityRequest struct {
+	// One of private, workspace, public. Unknown values are rejected rather
+	// than defaulted: silently widening an audience is the failure mode this
+	// endpoint must never have.
+	Visibility string `json:"visibility" binding:"required"`
+}
+
+// SetKnowledgeBaseVisibility godoc
+// @Summary      设置知识库可见范围
+// @Description  私有（仅自己与管理员）/ 本空间 / 公开（所有用户只读）。只有知识库所属空间可修改。
+func (h *KnowledgeBaseHandler) SetKnowledgeBaseVisibility(c *gin.Context) {
+	ctx := c.Request.Context()
+	id := c.Param("id")
+
+	var req SetKnowledgeBaseVisibilityRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		_ = c.Error(apperrors.NewBadRequestError("Invalid request parameters").WithDetails(err.Error()))
+		return
+	}
+	switch strings.ToLower(strings.TrimSpace(req.Visibility)) {
+	case types.KnowledgeBaseVisibilityPrivate,
+		types.KnowledgeBaseVisibilityWorkspace,
+		types.KnowledgeBaseVisibilityPublic:
+	default:
+		_ = c.Error(apperrors.NewBadRequestError("visibility must be private, workspace or public"))
+		return
+	}
+
+	// The caller's own workspace, read from the gin key rather than the request
+	// context: the KB route guard rewrites the context tenant to the KB's source
+	// workspace so that retrieval hits the right embedding store, and using that
+	// value here would let a reader in another workspace unpublish the KB.
+	callerTenantID := c.GetUint64(types.TenantIDContextKey.String())
+
+	kb, err := h.service.SetKnowledgeBaseVisibility(ctx, callerTenantID, id, req.Visibility)
+	if err != nil {
+		if appErr, ok := apperrors.IsAppError(err); ok {
+			_ = c.Error(appErr)
+			return
+		}
+		logger.ErrorWithFields(ctx, err, map[string]interface{}{"kb_id": id})
+		_ = c.Error(apperrors.NewInternalServerError(err.Error()))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    buildKBResponse(kb, h.resolveKBStoreView(ctx, kb, callerTenantID), nil),
+	})
+}
+
 // validateKnowledgeBaseSettingsUpdate applies the same settings permissions to
 // PUT and PATCH. Shared editors may edit content, while model settings require
 // an admin share. Only the owner workspace may change the storage binding.

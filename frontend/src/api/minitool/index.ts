@@ -4,7 +4,12 @@ import { del, get, post, put } from '@/utils/request'
 // the domain knowledge the model should apply when the card is attached to a
 // turn. Mirrors internal/types/minitool.go.
 
-export type MiniToolVisibility = 'private' | 'workspace'
+/**
+ * Who may read a card: private (creator + workspace admins), workspace (all
+ * members) or public (every account on the deployment, read-only for
+ * everybody outside the owning workspace).
+ */
+export type MiniToolVisibility = 'private' | 'workspace' | 'public'
 
 export interface MiniToolVariable {
   key: string
@@ -42,6 +47,9 @@ export interface MiniTool {
   usage_count: number
   can_edit: boolean
   can_delete: boolean
+  // Set when the card belongs to another workspace and is visible only because
+  // it is public. Read-only for this caller: edit/delete are always false.
+  is_foreign?: boolean
   created_at: string
   updated_at: string
 }

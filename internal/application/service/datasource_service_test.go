@@ -788,3 +788,9 @@ func TestIngestItem_URLCreationMetadataAttachFailure(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "attach datasource metadata")
 }
+
+// Visibility support added with the public/private KB option; unused by this
+// stub's callers.
+func (s *processSyncKBService) SetKnowledgeBaseVisibility(_ context.Context, _ uint64, _ string, _ string) (*types.KnowledgeBase, error) {
+	return nil, nil
+}

@@ -604,3 +604,14 @@ func copyTaskTestContext(t *testing.T, repo *fakeKBRepo, dst string) context.Con
 	require.NoError(t, err)
 	return ctx
 }
+
+// Visibility support added with the public/private KB option. These stubs are
+// only used by callers that never exercise the column, so the reads stay empty
+// and the write is a no-op.
+func (r *fakeKBRepo) ListPublicKnowledgeBases(_ context.Context, _ uint64) ([]*types.KnowledgeBase, error) {
+	return nil, nil
+}
+
+func (r *fakeKBRepo) SetKnowledgeBaseVisibility(_ context.Context, _ uint64, _ string, _ string) error {
+	return nil
+}
