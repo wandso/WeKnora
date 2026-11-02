@@ -38,6 +38,12 @@ func (f *fakeSkillCatalog) RegisterCatalogFromArchive(
 	return &types.TenantSkillCatalogEntity{ID: f.registerID, Name: "pdf"}, nil
 }
 
+func (f *fakeSkillCatalog) RegisterCatalogsFromArchive(
+	context.Context, uint64, []byte,
+) ([]*types.TenantSkillCatalogEntity, error) {
+	return []*types.TenantSkillCatalogEntity{{ID: f.registerID, Name: "pdf"}}, nil
+}
+
 func (f *fakeSkillCatalog) RegisterCatalogFromSource(
 	_ context.Context, _ uint64, source string,
 ) (*types.TenantSkillCatalogEntity, error) {

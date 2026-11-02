@@ -83,6 +83,56 @@ func (s *TenantSkillService) InstallSkill(
 	return s.installSkillArchive(ctx, tenantID, configID, archive, skillArchiveUploaded)
 }
 
+// InstallSkills validates an uploaded archive holding several skills, records
+// each one, and kicks off one install per skill in the background. It returns
+// the accepted skill IDs in archive order so the caller can answer 202 and let
+// the UI subscribe to each skill's progress stream.
+//
+// The archive is split by ParseSkillBundles into per-skill bundles; each is
+// repacked so its catalog bytes and skip-install digest describe that skill
+// alone instead of the whole upload.
+func (s *TenantSkillService) InstallSkills(
+	ctx context.Context, tenantID uint64, configID string, archive []byte,
+) ([]string, error) {
+	if err := s.requireSkillTarget(ctx, tenantID, configID); err != nil {
+		return nil, err
+	}
+
+	bundles, err := ParseSkillBundles(archive)
+	if err != nil {
+		return nil, err
+	}
+	if len(bundles) == 0 {
+		return nil, apperrors.NewBadRequestError("archive holds no skills")
+	}
+	seen := make(map[string]struct{}, len(bundles))
+	for _, bundle := range bundles {
+		if _, dup := seen[bundle.Name]; dup {
+			return nil, apperrors.NewBadRequestError(
+				fmt.Sprintf("archive holds more than one skill named %q", bundle.Name))
+		}
+		seen[bundle.Name] = struct{}{}
+	}
+
+	ids := make([]string, 0, len(bundles))
+	for _, bundle := range bundles {
+		subArchive, err := zipSkillFiles(bundle.Files)
+		if err != nil {
+			return nil, fmt.Errorf("repack skill %s: %w", bundle.Name, err)
+		}
+		// ParseSkillBundles already digests the same deterministic repack, so
+		// recomputing keeps the row's SHA256 in lockstep with the bytes this
+		// install hands to the catalog and the skip-install check.
+		bundle.SHA256 = skillArchiveSHA256(subArchive)
+		skillID, err := s.installParsedSkill(ctx, tenantID, configID, bundle, subArchive, skillArchiveUploaded)
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, skillID)
+	}
+	return ids, nil
+}
+
 func (s *TenantSkillService) installSkillArchive(
 	ctx context.Context, tenantID uint64, configID string, archive []byte,
 	origin skillArchiveOrigin, instructions ...string,
@@ -158,6 +208,8 @@ func (s *TenantSkillService) installParsedSkill(
 			ID: skillID, TenantID: tenantID, SandboxConfigID: configID,
 			Name: bundle.Name, Version: bundle.Version,
 			Description: bundle.Description, Instructions: bundle.Instructions,
+			Category: bundle.Category, RiskLevel: bundle.RiskLevel,
+			Keywords: joinSkillKeywords(bundle.Keywords), PromptHint: bundle.PromptHint,
 			BundleSHA256: bundle.SHA256, Enabled: true,
 			Status: types.SkillStatusInstalling, InstallingSince: &now,
 		}); err != nil {
@@ -372,6 +424,10 @@ func takeSkillRowForInstall(row *types.TenantSkillEntity, bundle *SkillBundle, n
 	row.Description = bundle.Description
 	row.Instructions = bundle.Instructions
 	row.BundleSHA256 = bundle.SHA256
+	row.Category = bundle.Category
+	row.RiskLevel = bundle.RiskLevel
+	row.Keywords = joinSkillKeywords(bundle.Keywords)
+	row.PromptHint = bundle.PromptHint
 	row.Status = types.SkillStatusInstalling
 	row.Error = ""
 	row.InstallingSince = &now

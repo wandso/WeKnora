@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "taizhou-water-rain-query": {
+      "type": "http",
+      "url": "https://10.33.120.178:50216/mcp",
+      "headers": {}
+    },
+    "taizhou-hr-cert-tender": {
+      "type": "http",
+      "url": "http://10.33.120.178:50310/prod-api/mcp",
+      "headers": {}
+    }
+  }
+}

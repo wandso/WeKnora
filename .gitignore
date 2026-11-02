@@ -63,3 +63,7 @@ miniprogram/project.private.config.json
 
 # Locally built BrowserSkill runtime and extension bundles
 /artifacts/browserskill/
+
+# Local MCP client configs (contain internal endpoints; keep out of VCS)
+.vscode/mcp.json
+.cursor/mcp.json

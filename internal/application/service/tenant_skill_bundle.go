@@ -53,6 +53,12 @@ type SkillBundle struct {
 	// before it would parse. The original file is unchanged; the install
 	// prompt tells the agent to mention this so the user can fix it.
 	FrontmatterRepaired bool
+	// Governance metadata from SKILL.md. Empty values are normal for
+	// third-party archives; the install stores the normalized defaults.
+	Category   string
+	RiskLevel  string
+	Keywords   []string
+	PromptHint string
 }
 
 // SkillBundleParseOptions relaxes the uploaded-zip rules for archives pulled
@@ -323,6 +329,10 @@ func skillBundleFromFiles(archive []byte, files map[string][]byte) (*SkillBundle
 		SHA256:              skillArchiveSHA256(archive),
 		Files:               files,
 		FrontmatterRepaired: skill.FrontmatterRepaired,
+		Category:            skill.NormalizedCategory(),
+		RiskLevel:           skill.NormalizedRiskLevel(),
+		Keywords:            []string(skill.Keywords),
+		PromptHint:          skill.PromptHint,
 	}, nil
 }
 
@@ -508,6 +518,152 @@ func uniqueStrings(in []string) []string {
 		}
 		seen[v] = struct{}{}
 		out = append(out, v)
+	}
+	return out
+}
+
+// joinSkillKeywords stores frontmatter keywords in the single column the
+// install row carries. A comma inside a keyword is not meaningful for
+// discovery, so trimming and joining is lossless enough for display.
+func joinSkillKeywords(keywords []string) string {
+	if len(keywords) == 0 {
+		return ""
+	}
+	out := make([]string, 0, len(keywords))
+	for _, keyword := range keywords {
+		keyword = strings.TrimSpace(keyword)
+		if keyword == "" {
+			continue
+		}
+		out = append(out, keyword)
+	}
+	return strings.Join(out, ",")
+}
+
+// ParseSkillBundles parses a zip that holds several skills, one per directory.
+// Each candidate directory must contain a SKILL.md; the directory name becomes
+// the skill name when SKILL.md declares none. Files outside every candidate
+// directory (a repo README, LICENSE, or a zipball wrapper folder) are dropped,
+// and a single flat skill (SKILL.md at the zip root) still comes back as one
+// bundle, so the caller never has to know which shape arrived.
+//
+// Each bundle is re-rooted and repacked into its own archive, so its SHA256
+// and catalog bytes describe that skill alone instead of the whole upload.
+func ParseSkillBundles(archive []byte) ([]*SkillBundle, error) {
+	raw, err := unzipSkillArchive(archive, SkillBundleParseOptions{AllowExtraFiles: true})
+	if err != nil {
+		return nil, err
+	}
+
+	var dirs []string
+	if _, ok := raw["SKILL.md"]; ok {
+		// A flat single-skill archive is one bundle with an empty root.
+		dirs = []string{""}
+	} else {
+		dirs = skillLayerDirs(raw, "")
+	}
+	if len(dirs) == 0 {
+		return nil, fmt.Errorf("%w: archive holds no skill (no directory containing SKILL.md)",
+			ErrSkillBundleInvalid)
+	}
+
+	bundles := make([]*SkillBundle, 0, len(dirs))
+	for _, dir := range dirs {
+		sub := reRootSkillFiles(raw, dir)
+		if _, ok := sub["SKILL.md"]; !ok {
+			return nil, fmt.Errorf("%w: SKILL.md is missing under %q", ErrSkillBundleInvalid, dir)
+		}
+		subArchive, err := zipSkillFiles(sub)
+		if err != nil {
+			return nil, fmt.Errorf("%w: repack skill %q: %v", ErrSkillBundleInvalid, dir, err)
+		}
+		bundle, err := skillBundleFromFiles(subArchive, sub)
+		if err != nil {
+			return nil, err
+		}
+		if strings.TrimSpace(bundle.Name) == "" {
+			bundle.Name = path.Base(dir)
+		}
+		bundles = append(bundles, bundle)
+	}
+	return bundles, nil
+}
+
+// skillLayerDirs returns the directories that directly contain a SKILL.md at
+// the shallowest level where any exist. It scans one level at a time so a
+// zipball that wraps the skills in a single outer folder (repo-main/skills/…)
+// still yields the skill directories and not the wrapper.
+func skillLayerDirs(raw map[string][]byte, prefix string) []string {
+	children := childDirs(raw, prefix)
+	if len(children) == 0 {
+		return nil
+	}
+	var direct []string
+	for _, child := range children {
+		if _, ok := raw[path.Join(child, "SKILL.md")]; ok {
+			direct = append(direct, child)
+		}
+	}
+	if len(direct) > 0 {
+		sort.Strings(direct)
+		return direct
+	}
+	var out []string
+	for _, child := range children {
+		out = append(out, skillLayerDirs(raw, child)...)
+	}
+	return out
+}
+
+// childDirs returns the first-level directories directly under prefix, each
+// as a prefix-qualified path. Files at prefix itself (dir == ".") are skipped.
+func childDirs(raw map[string][]byte, prefix string) []string {
+	seen := make(map[string]struct{})
+	for name := range raw {
+		dir := path.Dir(name)
+		if dir == "." {
+			dir = ""
+		}
+		rel := dir
+		if prefix != "" {
+			if !strings.HasPrefix(dir, prefix+"/") {
+				continue
+			}
+			rel = strings.TrimPrefix(dir, prefix+"/")
+		}
+		first := rel
+		if idx := strings.Index(rel, "/"); idx >= 0 {
+			first = rel[:idx]
+		}
+		if first == "" {
+			continue
+		}
+		full := first
+		if prefix != "" {
+			full = prefix + "/" + first
+		}
+		seen[full] = struct{}{}
+	}
+	out := make([]string, 0, len(seen))
+	for d := range seen {
+		out = append(out, d)
+	}
+	return out
+}
+
+// reRootSkillFiles returns the files under dir with the dir prefix stripped.
+// An empty dir is the archive root and keeps every file.
+func reRootSkillFiles(raw map[string][]byte, dir string) map[string][]byte {
+	out := make(map[string][]byte, len(raw))
+	for name, content := range raw {
+		if dir == "" {
+			out[name] = content
+			continue
+		}
+		if !strings.HasPrefix(name, dir+"/") {
+			continue
+		}
+		out[strings.TrimPrefix(name, dir+"/")] = content
 	}
 	return out
 }

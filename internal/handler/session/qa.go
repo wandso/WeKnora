@@ -72,6 +72,7 @@ type qaRequestContext struct {
 	tagIDs                []string
 	mcpServiceIDs         []string
 	skillNames            []string
+	miniToolIDs           []string
 	summaryModelID        string
 	reasoningEffort       string
 	localBrowserEnabled   bool
@@ -153,6 +154,7 @@ func (rc *qaRequestContext) buildQARequest() *types.QARequest {
 		TagScopes:           rc.tagScopes,
 		MCPServiceIDs:       rc.mcpServiceIDs,
 		SkillNames:          rc.skillNames,
+		MiniToolIDs:         rc.miniToolIDs,
 		ImageURLs:           imageURLs,
 		ImageDescription:    imageDescription,
 		UserMessageID:       rc.userMessageID,
@@ -521,6 +523,7 @@ func (h *Handler) parseQARequest(c *gin.Context, logPrefix string) (*qaRequestCo
 		tagIDs:                secutils.SanitizeForLogArray(tagIDs),
 		mcpServiceIDs:         secutils.SanitizeForLogArray(mcpServiceIDs),
 		skillNames:            secutils.SanitizeForLogArray(skillNames),
+		miniToolIDs:           secutils.SanitizeForLogArray(dedupRequestStrings(request.MiniToolIDs)),
 		summaryModelID:        secutils.SanitizeForLog(request.SummaryModelID),
 		reasoningEffort:       request.ReasoningEffort,
 		webSearchEnabled:      request.WebSearchEnabled,

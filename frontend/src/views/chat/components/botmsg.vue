@@ -86,6 +86,8 @@
                     :title="$t('agent.copy')">
                     <ChatActionIcon name="copy" />
                 </t-button>
+                <AnswerFeedbackButtons v-if="!embeddedMode"
+                    :session-id="sessionId" :message-id="session?.assistant_message_id || session?.id" />
                 <t-button size="small" variant="outline" shape="round" @click.stop="handleAddToKnowledge"
                     :title="$t('agent.addToKnowledgeBase')">
                     <ChatActionIcon name="bookmark-add" />
@@ -153,6 +155,7 @@ import deepThink from './deepThink.vue';
 import AgentStreamDisplay from './AgentStreamDisplay.vue';
 import RagPipelineProgress from './RagPipelineProgress.vue';
 import ChatActionIcon from '@/components/ChatActionIcon.vue';
+import AnswerFeedbackButtons from './AnswerFeedbackButtons.vue';
 import AssistantActionsButton from '@/components/assistant/AssistantActionsButton.vue';
 import ChatRequestInfoButton from '@/components/ChatRequestInfoButton.vue';
 import ChatCitationFloat from '@/components/ChatCitationFloat.vue';

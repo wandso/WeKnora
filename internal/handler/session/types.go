@@ -69,6 +69,9 @@ type CreateKnowledgeQARequest struct {
 	MCPServiceIDs []string `json:"mcp_service_ids"`
 	// Per-request Skills selected via @mention
 	SkillNames []string `json:"skill_names"`
+	// 小工具 cards attached to this turn only; added to the agent's own
+	// selection rather than replacing it.
+	MiniToolIDs []string `json:"mini_tool_ids"`
 	// @mentioned tag IDs (display/debug; scoped via MentionedItems)
 	TagIDs []string `json:"tag_ids"`
 	// @mentioned knowledge bases and files

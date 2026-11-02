@@ -5,6 +5,13 @@ import type { ConfigSkillFileContent, ConfigSkillFileEntry } from "../system";
 export interface SkillInfo {
   name: string;
   description: string;
+  // Governance metadata parsed from SKILL.md. category: safe | read_local |
+  // read_remote | write | unclassified; risk_level: low | medium | high |
+  // critical. Always present, so the UI need not guess a default.
+  category?: string;
+  risk_level?: string;
+  keywords?: string[];
+  prompt_hint?: string;
 }
 
 export interface SkillCatalogInstall {
@@ -32,6 +39,12 @@ export interface SkillCatalogItem {
   created_at: string;
   updated_at: string;
   installations: SkillCatalogInstall[];
+  // Governance metadata parsed from SKILL.md. The backend normalizes both
+  // values, so they are always one of the known vocabulary words.
+  category?: string;
+  risk_level?: string;
+  keywords?: string[];
+  prompt_hint?: string;
 }
 
 export interface SkillCatalogRegisterResult {
@@ -81,9 +94,13 @@ export function registerSkillCatalogFromFile(
 ) {
   const form = new FormData();
   form.append('file', file);
+  // A multi-skill zip registers every SKILL.md directory, so the response is a
+  // list of definitions; a single-skill zip answers with one object.
   return postUpload('/api/v1/skills/catalog', form, (e: any) => {
     if (e.total) onProgress?.(Math.round((e.loaded * 100) / e.total));
-  }, { timeout: 5 * 60 * 1000 }) as Promise<{ data: SkillCatalogRegisterResult }>;
+  }, { timeout: 5 * 60 * 1000 }) as Promise<{
+    data: SkillCatalogRegisterResult | SkillCatalogRegisterResult[];
+  }>;
 }
 
 export function installSkillCatalog(catalogId: string, sandboxConfigIds: string[]) {

@@ -1164,6 +1164,19 @@ export function uploadConfigSkill(
   }, { timeout: 5 * 60 * 1000 })
 }
 
+// Uploads one zip that bundles several skills; each top-level directory with a
+// SKILL.md becomes one skill. The server accepts the batch and answers with
+// every accepted skill id, each of which has its own install-events stream.
+export function uploadConfigSkillsMulti(
+  configId: string, file: File, onProgress?: (percent: number) => void,
+): Promise<{ data: { skill_ids: string[] } }> {
+  const form = new FormData()
+  form.append('file', file)
+  return postUpload(`/api/v1/sandbox-configs/${configId}/skills/multi`, form, (e: any) => {
+    if (e.total) onProgress?.(Math.round((e.loaded * 100) / e.total))
+  }, { timeout: 5 * 60 * 1000 })
+}
+
 export function installConfigSkillFromSource(
   configId: string,
   payload: { source: string },

@@ -63,6 +63,14 @@ type TenantSkillEntity struct {
 	Name        string `gorm:"type:varchar(255);not null"`
 	Version     string `gorm:"type:varchar(64)"`
 	Description string `gorm:"type:text"`
+	// Governance metadata parsed from SKILL.md. It is stored rather than
+	// re-parsed at read time because the UI lists skills without opening the
+	// bundle, and because an operator may want the classification to survive a
+	// reinstall of the same skill.
+	Category   string `gorm:"type:varchar(32)"`
+	RiskLevel  string `gorm:"type:varchar(16)"`
+	Keywords   string `gorm:"type:varchar(512)"`
+	PromptHint string `gorm:"type:text"`
 	// Instructions is the SKILL.md body (level 2 disclosure).
 	Instructions string `gorm:"type:text"`
 

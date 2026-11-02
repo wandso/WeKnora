@@ -219,6 +219,9 @@ func (e *AgentEngine) systemPromptOptions(ctx context.Context) *BuildSystemPromp
 	if e.skillsManager != nil && e.skillsManager.IsEnabled() {
 		opts.SkillsMetadata = e.skillsManager.GetAllMetadata()
 	}
+	if e.config != nil && len(e.config.MiniTools) > 0 {
+		opts.MiniToolsPrompt = formatMiniToolsPrompt(e.config.MiniTools)
+	}
 	if e.toolRegistry != nil {
 		opts.SelectedTools = e.toolRegistry.ListTools()
 		if _, err := e.toolRegistry.GetTool("local_browser"); err == nil {

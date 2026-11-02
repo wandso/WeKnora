@@ -224,6 +224,15 @@ type CustomAgentConfig struct {
 	// Selected skill names (only used when SkillsSelectionMode is "selected")
 	SelectedSkills []string `yaml:"selected_skills" json:"selected_skills" extensions:"x-agent,x-agent-detail"`
 
+	// ===== Mini Tools Settings (only for smart-reasoning mode) =====
+	// MiniToolsSelectionMode mirrors SkillsSelectionMode for the 小工具
+	// catalog: "all" injects every enabled workspace card, "selected" injects
+	// SelectedMiniTools, "none" injects only cards mentioned for one turn.
+	MiniToolsSelectionMode string `yaml:"mini_tools_selection_mode" json:"mini_tools_selection_mode,omitempty" extensions:"x-agent,x-agent-detail"`
+	// SelectedMiniTools holds card IDs (not names): a card can be renamed or
+	// edited without repointing every agent that uses it.
+	SelectedMiniTools []string `yaml:"selected_mini_tools" json:"selected_mini_tools,omitempty" extensions:"x-agent,x-agent-detail"`
+
 	// ===== Sandbox Settings =====
 	// SandboxConfigID selects which workspace sandbox config this agent's
 	// skill scripts run on. Empty means sandbox execution is disabled.

@@ -168,18 +168,21 @@ func NormalizePageView(view string) string {
 // replacing the previous 14-parameter method signatures.
 // EventBus is passed separately to avoid circular dependency with the event package.
 type QARequest struct {
-	Session             *Session           // The conversation session
-	Query               string             // User query text
-	AssistantMessageID  string             // Pre-created assistant message ID
-	SummaryModelID      string             // Optional model override; empty = use agent/KB default
-	ReasoningEffort     string             // Optional per-request override; empty = use agent default
-	CustomAgent         *CustomAgent       // Optional custom agent for config override
-	SharedAgentReadOnly bool               // True only when access came from an agent share; source-workspace writes are forbidden
-	KnowledgeBaseIDs    []string           // Knowledge base IDs to search (from request + @mentions)
-	KnowledgeIDs        []string           // Specific knowledge (file) IDs to search
-	TagScopes           []TagScope         // Tag-constrained KB scopes from @mentions
-	MCPServiceIDs       []string           // Per-request MCP service IDs from @mentions
-	SkillNames          []string           // Per-request skill names from @mentions
+	Session             *Session     // The conversation session
+	Query               string       // User query text
+	AssistantMessageID  string       // Pre-created assistant message ID
+	SummaryModelID      string       // Optional model override; empty = use agent/KB default
+	ReasoningEffort     string       // Optional per-request override; empty = use agent default
+	CustomAgent         *CustomAgent // Optional custom agent for config override
+	SharedAgentReadOnly bool         // True only when access came from an agent share; source-workspace writes are forbidden
+	KnowledgeBaseIDs    []string     // Knowledge base IDs to search (from request + @mentions)
+	KnowledgeIDs        []string     // Specific knowledge (file) IDs to search
+	TagScopes           []TagScope   // Tag-constrained KB scopes from @mentions
+	MCPServiceIDs       []string     // Per-request MCP service IDs from @mentions
+	SkillNames          []string     // Per-request skill names from @mentions
+	// MiniToolIDs are 小工具 cards attached to this turn only. They are added
+	// to the agent's own selection, never replacing it.
+	MiniToolIDs         []string
 	ImageURLs           []string           // Image URLs for multimodal input
 	ImageDescription    string             // VLM-generated image description (fallback for non-vision models)
 	UserMessageID       string             // Created user message ID

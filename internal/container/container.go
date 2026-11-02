@@ -195,6 +195,7 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(repository.NewTenantSandboxConfigRepository))
 	must(container.Provide(repository.NewTenantSkillRepository))
 	must(container.Provide(repository.NewCustomAgentRepository))
+	must(container.Provide(repository.NewMiniToolRepository))
 	must(container.Provide(repository.NewOrganizationRepository))
 	must(container.Provide(repository.NewKBShareRepository))
 	must(container.Provide(repository.NewAgentShareRepository))
@@ -202,6 +203,13 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(repository.NewMCPEndpointRepository))
 	must(container.Provide(repository.NewTenantDisabledSharedAgentRepository))
 	must(container.Provide(repository.NewUserResourceFavoriteRepository))
+	must(container.Provide(repository.NewAgentVersionRepository))
+	must(container.Provide(repository.NewMessageFeedbackRepository))
+	must(container.Provide(repository.NewAgentUsageRepository))
+	must(container.Provide(repository.NewAgentTemplateRepository))
+	must(container.Provide(repository.NewAgentPublicPageRepository))
+	must(container.Provide(repository.NewModerationRuleRepository))
+	must(container.Provide(repository.NewModerationHitRepository))
 	must(container.Provide(service.NewWebSearchStateService))
 	must(container.Provide(repository.NewDataSourceRepository))
 	must(container.Provide(repository.NewSyncLogRepository))
@@ -315,6 +323,13 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(service.NewMCPToolApprovalService))
 	must(container.Provide(service.NewCustomAgentService))
 	must(container.Provide(service.NewUserResourceFavoriteService))
+	must(container.Provide(service.NewAgentVersionService))
+	must(container.Provide(service.NewAgentDryRunService))
+	must(container.Provide(service.NewMessageFeedbackService))
+	must(container.Provide(service.NewAgentUsageService))
+	must(container.Provide(service.NewAgentTemplateService))
+	must(container.Provide(service.NewAgentPublicPageService))
+	must(container.Provide(service.NewModerationService))
 	must(container.Provide(service.NewWikiPageService))
 	must(container.Provide(service.NewWikiIngestService, dig.Name("wikiIngest")))
 	must(container.Provide(service.NewWikiLintService))
@@ -409,6 +424,7 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(service.NewAgentCollaboration))
 	must(container.Provide(service.NewNotificationService))
 	must(container.Provide(service.NewAutomationService))
+	must(container.Provide(service.NewMiniToolService))
 	must(container.Provide(service.NewAgentService))
 
 	// Session service (depends on agent service)
@@ -785,6 +801,8 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(handler.NewVectorStoreHandler))
 	must(container.Provide(handler.NewStorageBackendHandler))
 	must(container.Provide(handler.NewCustomAgentHandler))
+	must(container.Provide(handler.NewAgentOpsHandler))
+	must(container.Provide(handler.NewModerationHandler))
 	must(container.Provide(handler.NewUserResourceFavoriteHandler))
 	must(container.Provide(func(
 		s *service.TenantSkillService, agents interfaces.AgentShareService,
@@ -793,6 +811,7 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	}))
 	must(container.Provide(handler.NewOrganizationHandler))
 	must(container.Provide(handler.NewMemoryHandler))
+	must(container.Provide(handler.NewMiniToolHandler))
 	must(container.Provide(handler.NewAutomationHandler))
 
 	// Data source handler
@@ -842,6 +861,34 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	// name is a no-op, so the web build can invoke this without a local hook.
 	must(container.Invoke(func(cleaner interfaces.ResourceCleaner, _ *service.ShellJobService) {
 		cleaner.Promote("LocalShellJobs")
+	}))
+
+	// Wire version snapshots into the ordinary save path so every edit is
+	// recoverable without the caller having to publish explicitly.
+	//
+	// This Invoke has to sit at the end of BuildContainer, not next to the
+	// handler provider: Invoke resolves its arguments immediately, and
+	// NewCustomAgentHandler depends on services (notably *im.Service) that are
+	// registered further down this function. Running it here guarantees the
+	// whole graph exists, while dig's singleton cache means the router still
+	// receives the very same handler instance we decorate.
+	must(container.Invoke(func(
+		h *handler.CustomAgentHandler, v interfaces.AgentVersionService,
+	) {
+		h.WithSnapshotRecorder(v)
+	}))
+
+	// Seed the product-shipped agent templates. Idempotent by design, so this
+	// runs on every boot: a release that improves a template's prompt is picked
+	// up by existing deployments without a migration. Best-effort — a template
+	// problem must not stop the server from serving traffic.
+	must(container.Invoke(func(v interfaces.AgentTemplateService) {
+		n, err := v.SeedBuiltins(context.Background())
+		if err != nil {
+			logger.Warnf(ctx, "[Container] failed to seed builtin agent templates: %v", err)
+			return
+		}
+		logger.Infof(ctx, "[Container] seeded %d builtin agent templates", n)
 	}))
 
 	logger.Infof(ctx, "[Container] Container initialization completed successfully")

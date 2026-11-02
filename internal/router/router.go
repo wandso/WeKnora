@@ -81,6 +81,8 @@ type RouterParams struct {
 	FAQHandler                   *handler.FAQHandler
 	TagHandler                   *handler.TagHandler
 	CustomAgentHandler           *handler.CustomAgentHandler
+	AgentOpsHandler              *handler.AgentOpsHandler
+	ModerationHandler            *handler.ModerationHandler
 	UserFavoriteHandler          *handler.UserResourceFavoriteHandler
 	SkillHandler                 *handler.SkillHandler
 	OrganizationHandler          *handler.OrganizationHandler
@@ -97,6 +99,7 @@ type RouterParams struct {
 	WikiPageHandler              *handler.WikiPageHandler
 	MemoryHandler                *handler.MemoryHandler
 	AutomationHandler            *handler.AutomationHandler
+	MiniToolHandler              *handler.MiniToolHandler
 	HostSandbox                  service.HostSandboxManager
 	OperationDispatcher          *operations.HandlerDispatcher
 }
@@ -190,6 +193,10 @@ func NewRouter(params RouterParams) *gin.Engine {
 		params.StorageBackendResolver,
 		params.ResourceCatalog,
 	)
+
+	// Public agent landing pages (/api/v1/public/agents/:slug): a visitor
+	// following a shared link has no account, so this also precedes Auth.
+	RegisterAgentPublicRoutes(r, params.AgentOpsHandler)
 
 	// Workspace MCP server surface (/mcp/:endpoint_id): bearer-token auth per
 	// endpoint, so it must precede the global Auth middleware.
@@ -323,6 +330,8 @@ func NewRouter(params RouterParams) *gin.Engine {
 		RegisterVectorStoreRoutes(v1, params.VectorStoreHandler, rbacGuards)
 		RegisterStorageBackendRoutes(v1, params.StorageBackendHandler, rbacGuards)
 		RegisterCustomAgentRoutes(v1, params.CustomAgentHandler, rbacGuards)
+		RegisterAgentOpsRoutes(v1, params.AgentOpsHandler, rbacGuards)
+		RegisterModerationRoutes(v1, params.ModerationHandler, rbacGuards)
 		RegisterUserFavoriteRoutes(v1, params.UserFavoriteHandler, rbacGuards)
 		RegisterSkillRoutes(v1, params.SkillHandler, rbacGuards)
 		RegisterOrganizationRoutes(v1, params.OrganizationHandler, rbacGuards)
@@ -334,6 +343,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 		RegisterWikiPageRoutes(v1, params.WikiPageHandler, rbacGuards)
 		RegisterMemoryRoutes(v1, params.MemoryHandler, rbacGuards)
 		RegisterAutomationRoutes(v1, params.AutomationHandler, rbacGuards)
+		RegisterMiniToolRoutes(v1, params.MiniToolHandler, rbacGuards)
 		RegisterChunkerDebugRoutes(v1, rbacGuards)
 
 		// Fail fast if any declared API-key policy points at a route

@@ -170,6 +170,9 @@ type sessionService struct {
 	// TenantSkillService because that service depends on this one.
 	sandboxConfigRepo repository.TenantSandboxConfigRepository
 	tenantSkillRepo   repository.TenantSkillRepository
+	// miniTools resolves the 小工具 cards one turn injects. It is a service
+	// (not a repository) because visibility depends on the caller's identity.
+	miniTools interfaces.MiniToolService
 	// forkSnapshots retires provider snapshots when a forked session is deleted
 	// before its sandbox is provisioned. Nil uses NewResolverForkSnapshotDeleter
 	// from sandboxResolver/sandboxMgr.
@@ -208,6 +211,7 @@ func NewSessionService(cfg *config.Config,
 	memoryService interfaces.MemoryService,
 	sandboxConfigRepo repository.TenantSandboxConfigRepository,
 	tenantSkillRepo repository.TenantSkillRepository,
+	miniTools interfaces.MiniToolService,
 	busyGate *SessionBusyGate,
 	backgroundWork *BackgroundWork,
 ) interfaces.SessionService {
@@ -236,6 +240,7 @@ func NewSessionService(cfg *config.Config,
 		memoryService:         memoryService,
 		sandboxConfigRepo:     sandboxConfigRepo,
 		tenantSkillRepo:       tenantSkillRepo,
+		miniTools:             miniTools,
 		busyGate:              busyGate,
 		background:            backgroundWork,
 	}

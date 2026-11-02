@@ -1,0 +1,223 @@
+{
+  "source": "http://10.33.120.194:8088/api/v1/mcp-services",
+  "fetched_at": "2026-10-28T11:10+08:00",
+  "services": [
+    {
+      "usage_instructions": "暂停使用：当前保存的 http 不是此版本支持的 MCP transport，且端点协议、凭据与附件外发边界尚未完成核验。保留原连接信息，待核实协议后再启用；不上传内部工程文件或个人信息。",
+      "id": "5461090d-bc7b-419b-a9aa-2f6e4661f84c",
+      "tenant_id": 10000,
+      "name": "万方文献检索",
+      "description": "万方数据 MCP：检索并下载中文期刊、学位论文、标准文献，适合查规范条文背景与工程技术文献。",
+      "enabled": false,
+      "transport_type": "http",
+      "url": "https://api.wfdata.com/mcp/wf-search-download",
+      "advanced_config": {
+        "timeout": 30,
+        "retry_count": 3,
+        "retry_delay": 1
+      },
+      "is_builtin": false,
+      "created_at": "2026-10-22T00:48:19.71546Z",
+      "updated_at": "2026-10-22T03:02:09.829468Z",
+      "credentials": {
+        "api_key": {
+          "configured": false
+        },
+        "client_secret": {
+          "configured": false
+        },
+        "token": {
+          "configured": false
+        }
+      }
+    },
+    {
+      "usage_instructions": "暂停使用：当前保存的 http 不是此版本支持的 MCP transport，且端点协议、凭据与附件外发边界尚未完成核验。保留原连接信息，待核实协议后再启用；不上传内部工程文件或个人信息。",
+      "id": "e15481b3-c1d3-4bce-b646-0b429c8acc60",
+      "tenant_id": 10000,
+      "name": "WPS 文档转换",
+      "description": "ofdh 文档转换 MCP：Office/PDF 格式互转、提取文本。适合把外来图纸说明、报告转成可检索文本。",
+      "enabled": false,
+      "transport_type": "http",
+      "url": "https://www.ofdh.cn/mcp",
+      "headers": {
+        "Authorization": "Bearer ${OFDH_API_KEY}"
+      },
+      "advanced_config": {
+        "timeout": 30,
+        "retry_count": 3,
+        "retry_delay": 1
+      },
+      "is_builtin": false,
+      "created_at": "2026-10-22T00:48:19.535065Z",
+      "updated_at": "2026-10-22T03:02:09.804609Z",
+      "credentials": {
+        "api_key": {
+          "configured": false
+        },
+        "client_secret": {
+          "configured": false
+        },
+        "token": {
+          "configured": false
+        }
+      }
+    },
+    {
+      "usage_instructions": "暂停使用：当前保存的 http 不是此版本支持的 MCP transport，且端点协议、凭据与附件外发边界尚未完成核验。保留原连接信息，待核实协议后再启用；不上传内部工程文件或个人信息。",
+      "id": "c3cb919c-0bfa-4004-9ab9-d6e26ea8fdc3",
+      "tenant_id": 10000,
+      "name": "腾讯文档",
+      "description": "腾讯文档 MCP：读取与编辑在线文档、表格、幻灯片，适合院内共享文档与协作稿。",
+      "enabled": false,
+      "transport_type": "http",
+      "url": "https://docs.qq.com/openapi/mcp",
+      "advanced_config": {
+        "timeout": 30,
+        "retry_count": 3,
+        "retry_delay": 1
+      },
+      "is_builtin": false,
+      "created_at": "2026-10-22T00:48:19.418885Z",
+      "updated_at": "2026-10-22T03:02:09.799986Z",
+      "credentials": {
+        "api_key": {
+          "configured": false
+        },
+        "client_secret": {
+          "configured": false
+        },
+        "token": {
+          "configured": false
+        }
+      }
+    },
+    {
+      "usage_instructions": "仅供明确授权的人员证书与投标准备查询。按最小必要字段和人员范围检索，个人证书/照片不发送第三方；下载票据仅在用户明确请求下载指定材料时使用。不与技术标正文编写默认绑定，不批量导出全员信息。保留服务凭据与权限配置不变。",
+      "id": "a7537804-d30f-4bf3-8011-03eeb06108d8",
+      "tenant_id": 10000,
+      "name": "台州人事证书投标助手",
+      "description": "查询全公司投标所需人员执业资格、职称及聘任材料、学历学位证书，支持原图核对与Word嵌入下载票据",
+      "enabled": true,
+      "transport_type": "http-streamable",
+      "url": "http://10.33.120.178:50310/prod-api/mcp",
+      "auth_config": {
+        "auth_type": "bearer"
+      },
+      "advanced_config": {
+        "timeout": 30,
+        "retry_count": 3,
+        "retry_delay": 1
+      },
+      "is_builtin": false,
+      "created_at": "2026-10-22T00:21:23.405731Z",
+      "updated_at": "2026-10-22T03:02:09.794732Z",
+      "credentials": {
+        "api_key": {
+          "configured": false
+        },
+        "client_secret": {
+          "configured": false
+        },
+        "token": {
+          "configured": true
+        }
+      },
+      "catalog": {
+        "tool_count": 4,
+        "stale": false,
+        "synced_at": "2026-10-22T10:42:32.133219+08:00"
+      }
+    },
+    {
+      "usage_instructions": "用于查询台州实时水雨情（测站雨量、水库水位蓄水、河道水位、潮位、水闸状态）、水利工程基础信息（水库、堤防、灌区、山塘、泵站、海塘、水闸、水电站、库容曲线）、实时台风与历史台风灾情、城市与台州天气预报、水文洪水预报结果及水库调度方案只读信息。",
+      "id": "7f28defa-d62f-4a3f-b1a3-0ed903a45a7d",
+      "tenant_id": 10000,
+      "name": "台州水雨情业务查询",
+      "description": "查询台州实时水雨情（雨量、水库、河道、潮位、水闸）、水利工程基础档案、实时台风与路径、天气预报、水文洪水预报及水库调度只读结果。",
+      "enabled": true,
+      "transport_type": "http-streamable",
+      "url": "https://10.33.120.178:50216/mcp",
+      "auth_config": {
+        "auth_type": "oauth",
+        "api_key_header": "Authorization",
+        "scopes": [
+          "tool:query_river_level",
+          "tool:query_reservoir_level",
+          "tool:query_tide_level",
+          "tool:query_rainfall",
+          "tool:query_history_river_level",
+          "tool:query_station_water_level_series",
+          "tool:query_realtime_data",
+          "tool:query_station_rainfall",
+          "tool:query_reservoir_status",
+          "tool:query_reservoir_water_storage",
+          "tool:query_river_status",
+          "tool:query_sluice_status",
+          "tool:query_tide_status",
+          "tool:query_rainfall_extremes",
+          "tool:query_stbprp_base_info",
+          "tool:query_reservoir_lm_base_info",
+          "tool:query_reservoir_s_base_info",
+          "tool:query_dike_base_info",
+          "tool:query_irr_base_info",
+          "tool:query_mnpd_base_info",
+          "tool:query_pust_base_info",
+          "tool:query_seawall_base_info",
+          "tool:query_waga_base_info",
+          "tool:query_hydropower_project_info",
+          "tool:query_st_zvarl_b",
+          "tool:query_city_weather",
+          "tool:query_tz_weather",
+          "tool:query_realtime_typhoon_list",
+          "tool:query_typhoon_track_points",
+          "tool:query_typhoon_disaster_rain_max",
+          "tool:query_typhoon_disaster_summary",
+          "tool:query_typhoon_overview",
+          "tool:get_typhoon_list",
+          "tool:get_typhoon_rainfall",
+          "tool:get_forecast_status",
+          "tool:query_forecast_summary",
+          "tool:query_forecast_stats",
+          "tool:query_forecast_result",
+          "tool:query_forecast_plan_list",
+          "tool:observe_reservoir_schedule_job",
+          "tool:query_forecast_rainfall",
+          "tool:query_forecast_rainfall_grid_images",
+          "tool:query_intervention_rainfall_matrix",
+          "tool:resolve_forecast_reference",
+          "tool:preview_forecast_rainfall_transform",
+          "tool:query_reservoir_schedule_models",
+          "tool:query_reservoir_schedule_profile",
+          "tool:query_reservoir_schedule_lines"
+        ],
+        "auth_server_metadata_url": "https://10.33.120.178:50216/.well-known/oauth-authorization-server",
+        "client_id": "weknora-mcp-client"
+      },
+      "advanced_config": {
+        "timeout": 30,
+        "retry_count": 3,
+        "retry_delay": 1
+      },
+      "is_builtin": false,
+      "created_at": "2026-10-21T10:49:45.940857Z",
+      "updated_at": "2026-10-26T06:48:57.637268Z",
+      "credentials": {
+        "api_key": {
+          "configured": true
+        },
+        "client_secret": {
+          "configured": true
+        },
+        "token": {
+          "configured": false
+        }
+      },
+      "catalog": {
+        "tool_count": 48,
+        "stale": false,
+        "synced_at": "2026-10-23T16:52:48.100716+08:00"
+      }
+    }
+  ]
+}

@@ -547,6 +547,8 @@
                   :title="$t('agent.copy')" :aria-label="$t('agent.copy')">
                   <ChatActionIcon name="copy" />
                 </t-button>
+                <AnswerFeedbackButtons v-if="!embeddedMode && isConversationDone"
+                  :session-id="sessionId" :message-id="resolveAssistantMessageId(session)" />
                 <t-button v-if="!embeddedMode" size="small" variant="outline" shape="round" @click.stop="handleAddToKnowledge(event)"
                   :title="$t('agent.addToKnowledgeBase')">
                   <ChatActionIcon name="bookmark-add" />
@@ -810,6 +812,7 @@ import { isAssistantPageLink } from '@/utils/assistantPageLink';
 import AskUserCard from './AskUserCard.vue';
 import SecureFormCard from './SecureFormCard.vue';
 import ChatActionIcon from '@/components/ChatActionIcon.vue';
+import AnswerFeedbackButtons from './AnswerFeedbackButtons.vue';
 import ChatTimelineIcon from '@/components/ChatTimelineIcon.vue';
 import HostApprovalCard from './HostApprovalCard.vue';
 import HostReviewRecord from './HostReviewRecord.vue';

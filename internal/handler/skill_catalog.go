@@ -118,14 +118,24 @@ func (h *SkillHandler) RegisterCatalog(c *gin.Context) {
 		return
 	}
 
-	cat, err := h.catalog.RegisterCatalogFromArchive(
+	// A single-skill archive keeps the legacy single-object response; a
+	// multi-skill archive answers with the list of registered definitions.
+	cats, err := h.catalog.RegisterCatalogsFromArchive(
 		c.Request.Context(), sandboxConfigTenantID(c), archive,
 	)
 	if err != nil {
 		respondSkillServiceError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"success": true, "data": catalogIDResponse(cat)})
+	if len(cats) == 1 {
+		c.JSON(http.StatusCreated, gin.H{"success": true, "data": catalogIDResponse(cats[0])})
+		return
+	}
+	resp := make([]gin.H, 0, len(cats))
+	for _, cat := range cats {
+		resp = append(resp, catalogIDResponse(cat))
+	}
+	c.JSON(http.StatusCreated, gin.H{"success": true, "data": resp})
 }
 
 func (h *SkillHandler) registerCatalogFromSource(c *gin.Context) {

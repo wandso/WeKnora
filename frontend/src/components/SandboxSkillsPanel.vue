@@ -41,6 +41,14 @@
       <section v-if="mode === 'install'" class="setting-drawer__section">
         <h4 class="setting-drawer__section-title">{{ $t('settings.sandbox.skillUploadSection') }}</h4>
         <p class="installer-model-hint">{{ $t('settings.sandbox.skillUploadSectionHint', { size: MAX_SKILL_BUNDLE_SIZE_MB }) }}</p>
+        <div class="skill-upload-mode">
+          <t-checkbox v-model="multiUpload" class="skill-upload-mode__check">
+            {{ $t('settings.sandbox.skillMultiUploadSection') }}
+          </t-checkbox>
+          <p v-if="multiUpload" class="installer-model-hint skill-upload-mode__hint">
+            {{ $t('settings.sandbox.skillMultiUploadSectionHint') }}
+          </p>
+        </div>
         <input
           ref="fileInputRef"
           type="file"
@@ -638,6 +646,7 @@ import {
   reinstallConfigSkill,
   stopConfigSkill,
   uploadConfigSkill,
+  uploadConfigSkillsMulti,
   installConfigSkillFromSource,
   type ConfigSkill,
   type SandboxConfigRecord,
@@ -699,6 +708,9 @@ const loading = ref(false)
 const uploading = ref(false)
 const installingFromSource = ref(false)
 const uploadPercent = ref(0)
+// When true, the dropped zip is a batch of several skills: every top-level
+// directory holding a SKILL.md is installed as one skill.
+const multiUpload = ref(false)
 const sourceInput = ref('')
 const skills = ref<ConfigSkill[]>([])
 const togglingId = ref('')
@@ -1285,12 +1297,21 @@ async function uploadFile(file: File) {
   uploadPercent.value = 0
   try {
     await persistInstallerModel(installerModelId.value)
-    const res = await uploadConfigSkill(props.record.id, file, (percent) => {
-      uploadPercent.value = percent
-    })
-    MessagePlugin.success(t('settings.sandbox.skillUploadAccepted'))
-    const skillId = res?.data?.skill_id || ''
-    emit('installed', skillId)
+    if (multiUpload.value) {
+      const res = await uploadConfigSkillsMulti(props.record.id, file, (percent) => {
+        uploadPercent.value = percent
+      })
+      const ids = res?.data?.skill_ids || []
+      MessagePlugin.success(t('settings.sandbox.skillMultiUploadAccepted', { count: ids.length }))
+      for (const id of ids) emit('installed', id)
+    } else {
+      const res = await uploadConfigSkill(props.record.id, file, (percent) => {
+        uploadPercent.value = percent
+      })
+      MessagePlugin.success(t('settings.sandbox.skillUploadAccepted'))
+      const skillId = res?.data?.skill_id || ''
+      emit('installed', skillId)
+    }
   } catch (e: any) {
     MessagePlugin.error(skillBundleErrorMessage(e, 'settings.sandbox.skillUploadFailed'))
   } finally {
@@ -1528,6 +1549,19 @@ onUnmounted(() => {
 
 .file-input-hidden {
   display: none;
+}
+
+.skill-upload-mode {
+  margin-bottom: 12px;
+}
+
+.skill-upload-mode__check {
+  display: flex;
+  align-items: center;
+}
+
+.skill-upload-mode__hint {
+  margin-top: 6px;
 }
 
 .file-upload-area {

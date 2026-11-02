@@ -16,7 +16,7 @@ const access = (role: string | null, unsupported: string[] = [], superuser = fal
 })
 
 test('toolbox contains only the agreed tools; infrastructure and secrets stay in settings', () => {
-  assert.deepEqual(TOOLBOX_ITEMS.map((item) => item.key), ['skills', 'mcp', 'browserconnection'])
+  assert.deepEqual(TOOLBOX_ITEMS.map((item) => item.key), ['skills', 'minitools', 'reservoir', 'mcp', 'browserconnection'])
   const lookup = (key: string) => key.split('.').reduce<any>((node, part) => node?.[part], zhCN)
   for (const item of TOOLBOX_ITEMS) {
     for (const key of [item.title, item.description, 'help' in item ? item.help : undefined,

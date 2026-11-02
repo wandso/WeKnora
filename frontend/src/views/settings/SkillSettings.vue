@@ -25,10 +25,14 @@
 
     <template v-else>
       <Teleport to="#toolbox-toolbar" defer>
-        <t-input v-if="catalog.length > 0" v-model="query" class="list-search" :placeholder="$t('menu.search')"
-          :aria-label="$t('menu.search')" clearable>
-          <template #prefix-icon><t-icon name="search" size="16px" /></template>
-        </t-input>
+        <div class="skill-filters">
+          <t-select v-if="catalog.length > 0" v-model="categoryFilter" class="skill-filters__select"
+            :options="categoryFilterOptions" size="small" :aria-label="$t('settings.skills.governance.filterCategory')" />
+          <t-input v-if="catalog.length > 0" v-model="query" class="list-search" :placeholder="$t('menu.search')"
+            :aria-label="$t('menu.search')" clearable>
+            <template #prefix-icon><t-icon name="search" size="16px" /></template>
+          </t-input>
+        </div>
       </Teleport>
       <div v-if="catalog.length === 0" class="empty-state">
         <t-empty :description="skillText('emptyDesc')" />
@@ -68,6 +72,13 @@
                 <div class="skill-card__heading">
                   <h3 class="skill-card__title" :title="item.name">{{ item.name }}</h3>
                   <span v-if="item.version" class="skill-card__type">{{ item.version }}</span>
+                  <span v-if="governanceOf(item).category" class="skill-tag"
+                    :class="`skill-tag--category-${governanceOf(item).category}`"
+                    :title="governanceTooltip(item)">{{ categoryLabel(item) }}</span>
+                  <span v-if="governanceOf(item).risk" class="skill-tag skill-tag--risk"
+                    :class="`skill-tag--risk-${governanceOf(item).risk}`" :title="governanceTooltip(item)">
+                    {{ riskLabel(item) }}
+                  </span>
                 </div>
                 <div class="skill-card__actions">
                   <button type="button" class="skill-card__icon-btn" :title="$t('settings.sandbox.skillFiles')"
@@ -202,22 +213,24 @@
         </t-button>
       </template>
 
-      <article v-if="addStep > 0 && registeredCatalog" class="skill-card parsed-skill">
-        <div class="skill-card__main">
-          <div class="skill-card__body">
-            <div class="skill-card__header">
-              <div class="skill-card__badge" :style="skillBadgeStyle(registeredCatalog.name)" aria-hidden="true">
-                {{ skillInitial(registeredCatalog.name) }}
+      <template v-if="addStep > 0">
+        <article v-for="rc in registeredCatalogs" :key="rc.id" class="skill-card parsed-skill">
+          <div class="skill-card__main">
+            <div class="skill-card__body">
+              <div class="skill-card__header">
+                <div class="skill-card__badge" :style="skillBadgeStyle(rc.name)" aria-hidden="true">
+                  {{ skillInitial(rc.name) }}
+                </div>
+                <h3 class="skill-card__title" :title="rc.name">{{ rc.name }}</h3>
+                <span v-if="rc.version" class="skill-card__type">{{ rc.version }}</span>
               </div>
-              <h3 class="skill-card__title" :title="registeredCatalog.name">{{ registeredCatalog.name }}</h3>
-              <span v-if="registeredCatalog.version" class="skill-card__type">{{ registeredCatalog.version }}</span>
+              <p v-if="rc.description" class="skill-card__desc" :title="rc.description">
+                {{ compactText(rc.description) }}
+              </p>
             </div>
-            <p v-if="registeredCatalog.description" class="skill-card__desc" :title="registeredCatalog.description">
-              {{ compactText(registeredCatalog.description) }}
-            </p>
           </div>
-        </div>
-      </article>
+        </article>
+      </template>
 
       <template v-if="addStep === 0">
         <section class="setting-drawer__section">
@@ -225,7 +238,7 @@
           <p class="installer-model-hint">{{ $t('settings.sandbox.skillSourceSectionHint', { size: maxSkillBundleMB })
           }}</p>
           <t-input v-model="sourceInput" :placeholder="$t('settings.sandbox.skillSourcePlaceholder')"
-            :disabled="addBusy || !!registeredCatalog" @enter="handleAddPrimary" />
+            :disabled="addBusy || registeredCatalogs.length > 0" @enter="handleAddPrimary" />
         </section>
 
         <section class="setting-drawer__section">
@@ -235,9 +248,9 @@
           <input ref="fileInputRef" type="file" accept=".zip,application/zip" class="file-input-hidden"
             @change="onFileInputChange" />
           <div class="file-upload-area file-upload-area--large"
-            :class="{ 'has-file': !!pendingFile, 'is-disabled': addBusy || !!registeredCatalog }"
-            @click="!addBusy && !registeredCatalog && fileInputRef?.click()" @dragover.prevent @dragenter.prevent
-            @drop.prevent="onFileDrop">
+            :class="{ 'has-file': !!pendingFile, 'is-disabled': addBusy || registeredCatalogs.length > 0 }"
+            @click="!addBusy && registeredCatalogs.length === 0 && fileInputRef?.click()" @dragover.prevent
+            @dragenter.prevent @drop.prevent="onFileDrop">
             <div class="file-upload-content">
               <div class="file-upload-icon-wrap" aria-hidden="true">
                 <t-icon name="cloud-upload" size="32px" class="upload-icon" />
@@ -254,7 +267,7 @@
               <t-progress v-if="uploading" :percentage="uploadPercent" size="small" />
             </div>
           </div>
-          <t-button v-if="pendingFile && !registeredCatalog" variant="text" size="small" :disabled="addBusy"
+          <t-button v-if="pendingFile && registeredCatalogs.length === 0" variant="text" size="small" :disabled="addBusy"
             @click="pendingFile = null">
             {{ $t('settings.skills.addClearFile') }}
           </t-button>
@@ -452,14 +465,77 @@ const scriptsDisabled = ref(false)
 const policySaving = ref(false)
 const catalog = ref<SkillCatalogItem[]>([])
 const query = ref('')
-const filteredCatalog = computed(() => catalog.value.filter((item) => matchesResourceQuery(item, query.value)))
+// '' means "no filter". Kept separate from the text query so clearing the
+// search box does not silently widen the capability filter.
+const categoryFilter = ref('')
+const categoryFilterOptions = computed(() => {
+  const present = new Set(catalog.value.map((item) => governanceOf(item).category))
+  const order = ['safe', 'read_local', 'read_remote', 'write', 'unclassified']
+  const options = order
+    .filter((key) => present.has(key))
+    .map((key) => ({ value: key, label: categoryName(key) }))
+  return [{ value: '', label: t('settings.skills.governance.filterAll') }, ...options]
+})
+const filteredCatalog = computed(() =>
+  catalog.value.filter(
+    (item) =>
+      matchesResourceQuery(item, query.value) &&
+      (!categoryFilter.value || governanceOf(item).category === categoryFilter.value),
+  ),
+)
+// Governance vocabularies. The backend already normalizes both values, but the
+// lists here keep the CSS class names and i18n keys closed over known words.
+const SKILL_CATEGORY_KEYS = ['safe', 'read_local', 'read_remote', 'write', 'unclassified']
+const SKILL_RISK_KEYS = ['low', 'medium', 'high', 'critical']
+
+function governanceOf(item: SkillCatalogItem): { category: string; risk: string } {
+  const category = item.category && SKILL_CATEGORY_KEYS.includes(item.category) ? item.category : 'unclassified'
+  const risk = item.risk_level && SKILL_RISK_KEYS.includes(item.risk_level) ? item.risk_level : 'medium'
+  return { category, risk }
+}
+
+function categoryName(key: string): string {
+  return t(`settings.skills.governance.category.${key}`)
+}
+
+function riskName(key: string): string {
+  return t(`settings.skills.governance.risk.${key}`)
+}
+
+function categoryLabel(item: SkillCatalogItem): string {
+  return categoryName(governanceOf(item).category)
+}
+
+function riskLabel(item: SkillCatalogItem): string {
+  return riskName(governanceOf(item).risk)
+}
+
+// The badge shows at most two words, so the full classification (plus the
+// keywords the model matches on and any operator hint) lives in the tooltip.
+function governanceTooltip(item: SkillCatalogItem): string {
+  const { category } = governanceOf(item)
+  const lines = [
+    `${t('settings.skills.governance.categoryLabel')}: ${categoryName(category)}`,
+    `${t('settings.skills.governance.riskLabel')}: ${riskLabel(item)}`,
+  ]
+  if (category === 'unclassified') lines.push(t('settings.skills.governance.unclassifiedHint'))
+  if (item.keywords?.length) {
+    lines.push(`${t('settings.skills.governance.keywordsLabel')}: ${item.keywords.join(', ')}`)
+  }
+  if (item.prompt_hint) lines.push(`${t('settings.skills.governance.promptHintLabel')}: ${item.prompt_hint}`)
+  return lines.join('\n')
+}
+
 const focusedCatalogId = ref('')
 const deletingId = ref('')
 const showAdd = ref(false)
 const showInstall = ref(false)
 const showManage = ref(false)
 const addStep = ref(0)
-const registeredCatalog = ref<SkillCatalogRegisterResult | null>(null)
+// The definitions a zip upload registered. A single-skill zip is a one-element
+// list; a multi-skill zip holds one entry per SKILL.md directory.
+const registeredCatalogs = ref<SkillCatalogRegisterResult[]>([])
+const registeredCatalog = computed(() => registeredCatalogs.value[0] || null)
 const pendingFile = ref<File | null>(null)
 const addTargetIds = ref<string[]>([])
 const addSessionIds = ref<string[]>([])
@@ -526,7 +602,7 @@ const addPrimaryLoading = computed(() =>
 const addPrimaryDisabled = computed(() => {
   if (addBusy.value || installing.value) return true
   if (addStep.value === 0) {
-    if (registeredCatalog.value) return false
+    if (registeredCatalogs.value.length > 0) return false
     return !sourceInput.value.trim() && !pendingFile.value
   }
   return addTargetIds.value.length > 0 && !installerModelId.value
@@ -745,16 +821,18 @@ function catalogFromRegister(data: SkillCatalogRegisterResult | undefined, fallb
 }
 
 function syncRegisteredFromCatalog() {
-  const current = registeredCatalog.value
-  if (!current?.id) return
-  const item = catalog.value.find((row) => row.id === current.id)
-  if (!item) return
-  registeredCatalog.value = {
-    id: item.id,
-    name: item.name,
-    version: item.version,
-    description: item.description,
-  }
+  if (!registeredCatalogs.value.length) return
+  registeredCatalogs.value = registeredCatalogs.value.map((rc) => {
+    if (!rc.id) return rc
+    const item = catalog.value.find((row) => row.id === rc.id)
+    if (!item) return rc
+    return {
+      id: item.id,
+      name: item.name,
+      version: item.version,
+      description: item.description,
+    }
+  })
 }
 
 function compactText(value: string): string {
@@ -988,7 +1066,7 @@ function revealCatalog(id: string) {
 
 function resetAddWizard() {
   addStep.value = 0
-  registeredCatalog.value = null
+  registeredCatalogs.value = []
   pendingFile.value = null
   sourceInput.value = ''
   addTargetIds.value = []
@@ -1005,7 +1083,7 @@ async function openAdd() {
 
 function canJumpAddStep(index: number) {
   if (index === addStep.value) return false
-  return Boolean(registeredCatalog.value) || index < addStep.value
+  return registeredCatalogs.value.length > 0 || index < addStep.value
 }
 
 function goToAddStep(index: number) {
@@ -1068,7 +1146,7 @@ function isZipFile(file: File): boolean {
 }
 
 function acceptPendingFile(file: File) {
-  if (addBusy.value || registeredCatalog.value) return
+  if (addBusy.value || registeredCatalogs.value.length > 0) return
   if (!isZipFile(file)) {
     MessagePlugin.error(t('settings.sandbox.skillUploadFailed'))
     return
@@ -1104,7 +1182,7 @@ function skillRegisterErrorMessage(err: any, fromFile: boolean): string {
 }
 
 async function registerThenAdvance() {
-  if (registeredCatalog.value) {
+  if (registeredCatalogs.value.length > 0) {
     addTargetIds.value = defaultAddTargets()
     addStep.value = 1
     return
@@ -1113,27 +1191,38 @@ async function registerThenAdvance() {
   if (!pendingFile.value && !source) return
 
   try {
-    let registered: SkillCatalogRegisterResult | null = null
+    let registeredList: SkillCatalogRegisterResult[] = []
     if (pendingFile.value) {
       uploading.value = true
       uploadPercent.value = 0
       const res = await registerSkillCatalogFromFile(pendingFile.value, (percent) => {
         uploadPercent.value = percent
       })
-      registered = catalogFromRegister(res?.data, pendingFile.value.name)
+      // A multi-skill zip registers every SKILL.md directory; a single-skill
+      // zip answers with one object, so both shapes become a list.
+      const data = res?.data as unknown
+      const arr = Array.isArray(data) ? data : [data]
+      registeredList = arr
+        .map((row) => catalogFromRegister(row as SkillCatalogRegisterResult | undefined, pendingFile.value?.name || ''))
+        .filter((row): row is SkillCatalogRegisterResult => row !== null)
     } else {
       addingFromSource.value = true
       const res = await registerSkillCatalogFromSource(source)
-      registered = catalogFromRegister(res?.data, source)
+      const one = catalogFromRegister(res?.data, source)
+      registeredList = one ? [one] : []
     }
-    if (!registered) {
+    if (!registeredList.length) {
       await loadCatalog()
       return
     }
-    registeredCatalog.value = registered
+    registeredCatalogs.value = registeredList
     addTargetIds.value = defaultAddTargets()
     addStep.value = 1
-    MessagePlugin.success(t('settings.skills.registerAccepted'))
+    if (registeredList.length > 1) {
+      MessagePlugin.success(t('settings.skills.registerAcceptedMulti', { count: registeredList.length }))
+    } else {
+      MessagePlugin.success(t('settings.skills.registerAccepted'))
+    }
     await loadCatalog()
     syncRegisteredFromCatalog()
   } catch (e: any) {
@@ -1156,26 +1245,31 @@ async function handleAddPrimary() {
     await registerThenAdvance()
     return
   }
-  const catalogId = registeredCatalog.value?.id
-  if (!catalogId) return
+  const catalogIds = registeredCatalogs.value.map((rc) => rc.id).filter(Boolean)
+  if (catalogIds.length === 0) return
   const targets = [...addTargetIds.value]
   if (targets.length === 0) {
     showAdd.value = false
-    revealCatalog(catalogId)
+    revealCatalog(catalogIds[0])
     return
   }
   const upgrading = pickedOnlyUpgrades(addPickRows.value, targets)
   installing.value = true
   try {
     await ensureInstallerModelIfNeeded(targets)
-    const res = await installSkillCatalog(catalogId, targets)
-    const failed = catalogInstallFailedCount(res)
-    if (failed > 0) {
-      MessagePlugin.warning(t('settings.skills.installPartial', { failed }))
+    let totalFailed = 0
+    for (const catalogId of catalogIds) {
+      const res = await installSkillCatalog(catalogId, targets)
+      totalFailed += catalogInstallFailedCount(res)
+    }
+    rememberSession(addSessionIds, targets)
+    if (totalFailed > 0) {
+      MessagePlugin.warning(t('settings.skills.installPartial', { failed: totalFailed }))
+    } else if (catalogIds.length > 1) {
+      MessagePlugin.success(t('settings.skills.installAcceptedMulti', { count: catalogIds.length }))
     } else {
       MessagePlugin.success(t(upgrading ? 'settings.skills.upgradeAccepted' : 'settings.skills.installAccepted'))
     }
-    rememberSession(addSessionIds, targets)
     await loadCatalog()
     prunePicks(addTargetIds, addPickRows.value)
   } catch (e: any) {
@@ -1192,7 +1286,7 @@ function onFileInputChange(event: Event) {
 }
 
 function onFileDrop(event: DragEvent) {
-  if (addBusy.value || registeredCatalog.value) return
+  if (addBusy.value || registeredCatalogs.value.length > 0) return
   const file = event.dataTransfer?.files?.[0]
   if (file) acceptPendingFile(file)
 }
@@ -1688,6 +1782,76 @@ onUnmounted(() => {
   line-height: 18px;
   color: var(--td-text-color-placeholder);
   font-variant-numeric: tabular-nums;
+}
+
+// Governance badges. Both carry their meaning in colour AND text: an operator
+// scanning the list must not have to remember a colour legend, and a risk that
+// only differs by hue fails for colour-blind readers.
+.skill-tag {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: var(--app-radius-sm);
+  font-size: var(--app-text-xs);
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.skill-tag--category-safe {
+  border-color: color-mix(in srgb, var(--td-success-color) 32%, transparent);
+  background: color-mix(in srgb, var(--td-success-color) 10%, transparent);
+  color: var(--td-success-color);
+}
+
+.skill-tag--category-read_local,
+.skill-tag--category-read_remote {
+  border-color: color-mix(in srgb, var(--td-brand-color) 32%, transparent);
+  background: color-mix(in srgb, var(--td-brand-color) 8%, transparent);
+  color: var(--td-brand-color);
+}
+
+.skill-tag--category-write {
+  border-color: color-mix(in srgb, var(--td-warning-color) 38%, transparent);
+  background: color-mix(in srgb, var(--td-warning-color) 12%, transparent);
+  color: var(--td-warning-color);
+}
+
+.skill-tag--category-unclassified {
+  border-color: var(--td-component-stroke);
+  background: var(--td-bg-color-secondarycontainer);
+  color: var(--td-text-color-placeholder);
+}
+
+.skill-tag--risk-low {
+  color: var(--td-text-color-secondary);
+}
+
+.skill-tag--risk-medium {
+  color: var(--td-warning-color);
+}
+
+.skill-tag--risk-high,
+.skill-tag--risk-critical {
+  border-color: color-mix(in srgb, var(--td-error-color) 32%, transparent);
+  background: color-mix(in srgb, var(--td-error-color) 8%, transparent);
+  color: var(--td-error-color);
+}
+
+.skill-tag--risk-critical {
+  font-weight: 600;
+}
+
+.skill-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.skill-filters__select {
+  width: 132px;
+  flex-shrink: 0;
 }
 
 .skill-card__desc {

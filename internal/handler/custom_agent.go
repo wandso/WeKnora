@@ -28,6 +28,13 @@ type sandboxConfigLookup interface {
 	Get(ctx context.Context, tenantID uint64, id string) (*types.TenantSandboxConfigEntity, error)
 }
 
+// AgentSnapshotRecorder records an immutable snapshot of an agent after it is
+// created or edited. It is an optional collaborator: when nil (partially wired
+// unit tests), editing behaves exactly as before.
+type AgentSnapshotRecorder interface {
+	Snapshot(ctx context.Context, agent *types.CustomAgent, source, changelog, userID string) (*types.AgentVersion, error)
+}
+
 // CustomAgentHandler defines the HTTP handler for custom agent operations
 type CustomAgentHandler struct {
 	service      interfaces.CustomAgentService
@@ -41,7 +48,35 @@ type CustomAgentHandler struct {
 	sandboxConfigs     sandboxConfigLookup
 	usableSkills       usableSkillLister
 	webSearchProviders interfaces.WebSearchProviderRepository
-	desktop            bool
+	// miniTools validates the card IDs an agent selects. Optional: nil leaves
+	// the IDs unchecked, which only means a dangling reference injects nothing.
+	miniTools interfaces.MiniToolService
+	desktop   bool
+	// snapshots is wired by the container after construction. See
+	// WithSnapshotRecorder.
+	snapshots AgentSnapshotRecorder
+}
+
+// WithSnapshotRecorder attaches version snapshotting. Called once at startup so
+// the constructor signature (and every test that builds it) stays unchanged.
+func (h *CustomAgentHandler) WithSnapshotRecorder(r AgentSnapshotRecorder) *CustomAgentHandler {
+	h.snapshots = r
+	return h
+}
+
+// recordSnapshot is best-effort: a failed bookkeeping write must never fail the
+// user's edit, which has already been persisted at this point.
+func (h *CustomAgentHandler) recordSnapshot(ctx context.Context, agent *types.CustomAgent, source string) {
+	if h.snapshots == nil || agent == nil {
+		return
+	}
+	userID, _ := types.UserIDFromContext(ctx)
+	if _, err := h.snapshots.Snapshot(ctx, agent, source, "", userID); err != nil {
+		logger.ErrorWithFields(ctx, err, map[string]interface{}{
+			"agent_id": agent.ID,
+			"source":   source,
+		})
+	}
 }
 
 // NewCustomAgentHandler creates a new custom agent handler instance
@@ -54,6 +89,7 @@ func NewCustomAgentHandler(
 	host service.HostSandboxManager,
 	usableSkills *service.TenantSkillService,
 	webSearchProviders interfaces.WebSearchProviderRepository,
+	miniTools interfaces.MiniToolService,
 ) *CustomAgentHandler {
 	return &CustomAgentHandler{
 		service:            service,
@@ -63,6 +99,7 @@ func NewCustomAgentHandler(
 		sandboxConfigs:     sandboxConfigs,
 		usableSkills:       usableSkills,
 		webSearchProviders: webSearchProviders,
+		miniTools:          miniTools,
 		desktop:            host.Desktop,
 	}
 }
@@ -106,6 +143,11 @@ type PatchAgentRequest struct {
 	// Selected skill names, replacing the current ones; without
 	// skills_selection_mode it also switches the mode to selected
 	SelectedSkills *[]string `json:"selected_skills" extensions:"x-agent,x-agent-maximum=50"`
+	// Mini tools used: all, selected (selected_mini_tools) or none
+	MiniToolsSelectionMode *string `json:"mini_tools_selection_mode" enums:"all,selected,none" extensions:"x-agent"`
+	// Selected mini tool card IDs, replacing the current ones; without
+	// mini_tools_selection_mode it also switches the mode to selected
+	SelectedMiniTools *[]string `json:"selected_mini_tools" extensions:"x-agent,x-agent-maximum=50"`
 	// Whether the agent may search the web
 	WebSearchEnabled *bool `json:"web_search_enabled" extensions:"x-agent"`
 	// Empty follows the workspace default; changing the provider does not enable search.
@@ -158,6 +200,18 @@ func (p PatchAgentRequest) apply(agent *types.CustomAgent) UpdateAgentRequest {
 	if p.SelectedSkills != nil || p.SkillsSelectionMode != nil {
 		if cfg.SkillsSelectionMode == "all" || cfg.SkillsSelectionMode == "none" {
 			cfg.SelectedSkills = []string{}
+		}
+	}
+	if p.SelectedMiniTools != nil {
+		cfg.SelectedMiniTools = append([]string{}, *p.SelectedMiniTools...)
+		cfg.MiniToolsSelectionMode = "selected"
+	}
+	if p.MiniToolsSelectionMode != nil {
+		cfg.MiniToolsSelectionMode = *p.MiniToolsSelectionMode
+	}
+	if p.SelectedMiniTools != nil || p.MiniToolsSelectionMode != nil {
+		if cfg.MiniToolsSelectionMode == "all" || cfg.MiniToolsSelectionMode == "none" {
+			cfg.SelectedMiniTools = []string{}
 		}
 	}
 	if p.WebSearchEnabled != nil {
@@ -291,6 +345,7 @@ func (h *CustomAgentHandler) CreateAgent(c *gin.Context) {
 
 	logger.Infof(ctx, "Custom agent created successfully, ID: %s, name: %s",
 		secutils.SanitizeForLog(createdAgent.ID), secutils.SanitizeForLog(createdAgent.Name))
+	h.recordSnapshot(ctx, createdAgent, types.AgentVersionSourceCreate)
 	resp := gin.H{
 		"success": true,
 		"data":    createdAgent,
@@ -559,7 +614,7 @@ func (h *CustomAgentHandler) PatchAgent(c *gin.Context) {
 		return
 	}
 	if !validSelectionMode(patch.KBSelectionMode) || !validSelectionMode(patch.MCPSelectionMode) ||
-		!validSelectionMode(patch.SkillsSelectionMode) {
+		!validSelectionMode(patch.SkillsSelectionMode) || !validSelectionMode(patch.MiniToolsSelectionMode) {
 		_ = c.Error(errors.NewBadRequestError("selection mode must be all, selected or none"))
 		return
 	}
@@ -593,6 +648,10 @@ func (h *CustomAgentHandler) PatchAgent(c *gin.Context) {
 		_ = c.Error(errors.NewBadRequestError("selected_skills must contain at most 50 names"))
 		return
 	}
+	if patch.SelectedMiniTools != nil && len(*patch.SelectedMiniTools) > 50 {
+		_ = c.Error(errors.NewBadRequestError("selected_mini_tools must contain at most 50 ids"))
+		return
+	}
 	skillTarget := req.Config.SandboxConfigID
 	if h.desktop {
 		// Lite agents store no sandbox config; their skills run on the host.
@@ -607,6 +666,12 @@ func (h *CustomAgentHandler) PatchAgent(c *gin.Context) {
 			return
 		}
 		if err := h.validateAgentSkillNames(ctx, req.Config, skillTarget); err != nil {
+			_ = c.Error(err)
+			return
+		}
+	}
+	if patch.MiniToolsSelectionMode != nil || patch.SelectedMiniTools != nil {
+		if err := h.validateAgentMiniToolIDs(ctx, req.Config); err != nil {
 			_ = c.Error(err)
 			return
 		}
@@ -645,6 +710,36 @@ func (h *CustomAgentHandler) validateAgentSkillNames(
 	return nil
 }
 
+// validateAgentMiniToolIDs rejects ids the caller cannot read: a card deleted
+// or made private since the agent was saved would otherwise inject nothing
+// while the editor still showed it as bound. A nil service (partially wired
+// tests) leaves the ids unchecked.
+func (h *CustomAgentHandler) validateAgentMiniToolIDs(
+	ctx context.Context, cfg types.CustomAgentConfig,
+) error {
+	if cfg.MiniToolsSelectionMode != "selected" || len(cfg.SelectedMiniTools) == 0 || h.miniTools == nil {
+		return nil
+	}
+	if len(cfg.SelectedMiniTools) > 50 {
+		return errors.NewBadRequestError("selected_mini_tools must contain at most 50 ids")
+	}
+	var unknown []string
+	seen := make(map[string]struct{}, len(cfg.SelectedMiniTools))
+	for _, id := range cfg.SelectedMiniTools {
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		if _, err := h.miniTools.Get(ctx, id); err != nil {
+			unknown = append(unknown, id)
+		}
+	}
+	if len(unknown) > 0 {
+		return errors.NewBadRequestError("Unknown or unavailable mini tools: " + strings.Join(unknown, ", "))
+	}
+	return nil
+}
+
 // saveAgentUpdate validates and stores a full update of agent id, for both
 // PUT and PATCH.
 func (h *CustomAgentHandler) saveAgentUpdate(c *gin.Context, id string, req UpdateAgentRequest) {
@@ -658,6 +753,10 @@ func (h *CustomAgentHandler) saveAgentUpdate(c *gin.Context, id string, req Upda
 		return
 	}
 	if err := normalizeAgentReasoningEffort(&req.Config); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	if err := h.validateAgentMiniToolIDs(ctx, req.Config); err != nil {
 		_ = c.Error(err)
 		return
 	}
@@ -733,6 +832,7 @@ func (h *CustomAgentHandler) saveAgentUpdate(c *gin.Context, id string, req Upda
 	}
 
 	logger.Infof(ctx, "Custom agent updated successfully, ID: %s", secutils.SanitizeForLog(id))
+	h.recordSnapshot(ctx, updatedAgent, types.AgentVersionSourceUpdate)
 	resp := gin.H{
 		"success": true,
 		"data":    updatedAgent,

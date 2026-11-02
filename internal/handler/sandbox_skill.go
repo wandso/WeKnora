@@ -50,6 +50,7 @@ type sandboxSkillService interface {
 		update service.SkillAdminUpdate,
 	) (*types.TenantSkillEntity, error)
 	InstallSkill(ctx context.Context, tenantID uint64, configID string, archive []byte) (string, error)
+	InstallSkills(ctx context.Context, tenantID uint64, configID string, archive []byte) ([]string, error)
 	InstallSkillFromSource(
 		ctx context.Context, tenantID uint64, configID, source string,
 	) (string, error)
@@ -130,6 +131,11 @@ type skillResponse struct {
 // skillAccepted is the data of an accepted install or removal.
 type skillAccepted struct {
 	SkillID string `json:"skill_id" extensions:"x-agent"`
+}
+
+// skillBatchAccepted is the data of an accepted multi-skill install.
+type skillBatchAccepted struct {
+	SkillIDs []string `json:"skill_ids" extensions:"x-agent"`
 }
 
 // skillEnvResponse is one declared environment variable. It reports whether a
@@ -377,6 +383,65 @@ func (h *SandboxSkillHandler) Upload(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusAccepted, gin.H{"success": true, "data": skillAccepted{SkillID: skillID}})
+}
+
+// UploadMulti godoc
+// @Summary      Install several skills from one archive
+// @Description  Install every skill in a multi-skill zip onto this sandbox
+// @Description  config's image. Each top-level directory holding a SKILL.md is
+// @Description  one skill; the directory name names it when SKILL.md declares
+// @Description  none. Send the zip as multipart form field "file". The
+// @Description  installs boot sandboxes and run for minutes, so the request is
+// @Description  only accepted; follow each skill via its install-events stream.
+// @Tags         SandboxConfig
+// @Accept       multipart/form-data
+// @Produce      json
+// @Param        id   path      string  true  "Sandbox config ID: the agent's sandbox_config_id, or host on WeKnora Lite"  extensions(x-agent=sandbox_config_id)
+// @Param        file formData  file    true  "Multi-skill bundle (zip)"
+// @Success      202  {object}  handler.DataResponse{data=handler.skillBatchAccepted}  "Installs accepted"
+// @Failure      400  {object}  apperrors.AppError  "Missing, oversized or invalid bundle"
+// @Failure      401  {object}  map[string]interface{}  "Unauthorized"
+// @Failure      404  {object}  apperrors.AppError  "Sandbox config not found"
+// @Security     Bearer
+// @Security     ApiKeyAuth
+// @x-agent      {"id":"skill.install_multi","risk":"write","role":"admin","always_confirm":true}
+// @Router       /sandbox-configs/{id}/skills/multi [post]
+func (h *SandboxSkillHandler) UploadMulti(c *gin.Context) {
+	maxBytes := secutils.GetMaxSkillBundleSize()
+	limitSkillUploadBody(c, maxBytes)
+
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		if isRequestBodyTooLarge(err) {
+			_ = c.Error(skillTooLargeError())
+			return
+		}
+		_ = c.Error(apperrors.NewBadRequestError("file is required"))
+		return
+	}
+	defer func() { _ = file.Close() }()
+	if header.Size > maxBytes {
+		_ = c.Error(skillTooLargeError())
+		return
+	}
+	archive, err := io.ReadAll(io.LimitReader(file, maxBytes+1))
+	if err != nil {
+		_ = c.Error(apperrors.NewBadRequestError("failed to read the uploaded skill bundle"))
+		return
+	}
+	if int64(len(archive)) > maxBytes {
+		_ = c.Error(skillTooLargeError())
+		return
+	}
+
+	skillIDs, err := h.service.InstallSkills(
+		c.Request.Context(), sandboxConfigTenantID(c), c.Param("id"), archive,
+	)
+	if err != nil {
+		respondSkillServiceError(c, err)
+		return
+	}
+	c.JSON(http.StatusAccepted, gin.H{"success": true, "data": skillBatchAccepted{SkillIDs: skillIDs}})
 }
 
 type skillSourceRequest struct {

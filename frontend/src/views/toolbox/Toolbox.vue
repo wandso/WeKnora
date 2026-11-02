@@ -45,6 +45,8 @@
         <div class="toolbox-panel">
           <SkillSettings v-if="selectedItem.key === 'skills'" ref="panel" :key="sandboxId"
             :initial-sandbox-id="sandboxId" @count="counts.skills = $event" />
+          <MiniToolsPanel v-else-if="selectedItem.key === 'minitools'" ref="panel" @count="counts.minitools = $event" />
+          <ReservoirToolPanel v-else-if="selectedItem.key === 'reservoir'" />
           <McpSettings v-else-if="selectedItem.key === 'mcp'" ref="panel" @count="counts.mcp = $event" />
           <BrowserConnectionSettings v-else-if="selectedItem.key === 'browserconnection'" />
         </div>
@@ -64,6 +66,7 @@ import { useBrowserConnectionStore } from '@/stores/browserConnection'
 import { useDeploymentCapabilitiesStore } from '@/stores/deploymentCapabilities'
 import { listSkillCatalog } from '@/api/skill'
 import { listMCPServices } from '@/api/mcp-service'
+import { listMiniTools } from '@/api/minitool'
 import {
   TOOLBOX_ITEMS,
   canAccessToolboxSection,
@@ -74,6 +77,8 @@ import ResourceIcon from '@/components/icons/ResourceIcon.vue'
 import BrowserIcon from '@/components/icons/BrowserIcon.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import SkillSettings from '@/views/settings/SkillSettings.vue'
+import MiniToolsPanel from './MiniToolsPanel.vue'
+import ReservoirToolPanel from './ReservoirToolPanel.vue'
 import McpSettings from '@/views/settings/McpSettings.vue'
 import BrowserConnectionSettings from '@/views/settings/BrowserConnectionSettings.vue'
 
@@ -116,6 +121,8 @@ watch([selectedItem, visibleItems], () => {
 // Tab badges for tools that are not open; the open panel keeps its own badge current.
 const summaries: Record<ToolboxSection, () => Promise<void>> = {
   skills: async () => { counts.skills = (await listSkillCatalog())?.data?.length ?? 0 },
+  minitools: async () => { counts.minitools = (await listMiniTools()).data?.length ?? 0 },
+  reservoir: async () => { /* 内置工具，无数量角标 */ },
   mcp: async () => { counts.mcp = (await listMCPServices()).length },
   browserconnection: async () => { if (!browserConnection.loaded) await browserConnection.refresh() },
 }
@@ -229,13 +236,52 @@ watch(() => visibleItems.value.map((item) => item.key), (keys, previous = []) =>
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  gap: 16px;
 
-  :deep(.t-input__wrap) {
+  // 搜索框定宽只作用于 .list-search 本身，避免波及下拉框内部的包裹层。
+  :deep(.list-search) {
     width: 240px;
+    flex: 0 0 240px;
+  }
+
+  :deep(.list-search .t-input__wrap) {
+    width: 100%;
   }
 
   :deep(.t-input) {
     border-radius: var(--app-radius-sm);
+  }
+
+  // 分类下拉与搜索框之间留出明确间隔：下拉框靠左、搜索框靠右，
+  // 任何一侧的内容溢出都不会压到对方身上。
+  :deep(.skill-filters) {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
+    flex-wrap: nowrap;
+  }
+
+  :deep(.skill-filters__select) {
+    width: 132px;
+    flex: 0 0 132px;
+    min-width: 0;
+  }
+
+  :deep(.skill-filters__select .t-select__wrap),
+  :deep(.skill-filters__select .t-select-input),
+  :deep(.skill-filters__select .t-input__wrap) {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  // 选项文字过长时省略，不允许画到搜索框上
+  :deep(.skill-filters__select .t-input__inner),
+  :deep(.skill-filters__select .t-select-input__wrap) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 
@@ -369,7 +415,16 @@ watch(() => visibleItems.value.map((item) => item.key), (keys, previous = []) =>
       display: none;
     }
 
-    :deep(.t-input__wrap) {
+    :deep(.skill-filters) {
+      width: 100%;
+    }
+
+    :deep(.list-search) {
+      width: auto;
+      flex: 1 1 auto;
+    }
+
+    :deep(.list-search .t-input__wrap) {
       width: 100%;
     }
   }

@@ -1434,6 +1434,11 @@
                       <div class="skill-pick__title-row">
                         <span class="skill-name" :title="skill.name">{{ skill.name }}</span>
                         <span
+                          class="skill-pick__risk"
+                          :class="`skill-pick__risk--${skillRiskLevel(skill)}`"
+                          :title="`${$t('agent.editor.skillRiskLabel')}: ${skillRiskText(skillRiskLevel(skill))}`"
+                        >{{ skillRiskText(skillRiskLevel(skill)) }}</span>
+                        <span
                           v-if="!skill.selectable"
                           class="skill-pick__hint"
                           :class="{ 'skill-pick__hint--busy': isSkillBusy(skill) }"
@@ -1503,7 +1508,66 @@
         </div>
       </div>
 
-      <!-- 知识库配置 -->
+      <!-- 小工具：带公式与领域知识的预设卡片，绑定后每次对话自动注入 -->
+      <div v-show="currentSection === 'minitools' && isAgentMode" class="section">
+        <div class="section-header">
+          <h2>{{ $t('agent.editor.miniToolsConfig') }}</h2>
+          <p class="section-description">{{ $t('agent.editor.miniToolsConfigDesc') }}</p>
+        </div>
+
+        <div class="settings-group">
+          <div class="setting-row">
+            <div class="setting-info">
+              <label>{{ $t('agent.editor.miniToolsSelection') }}</label>
+              <p class="desc">{{ $t('miniTools.description') }}</p>
+            </div>
+            <div class="setting-control sandbox-select-control">
+              <t-radio-group :model-value="miniToolsSelectionMode" @change="onMiniToolsModeChange">
+                <t-radio-button value="all">{{ $t('agent.editor.miniToolsAll') }}</t-radio-button>
+                <t-radio-button value="selected">{{ $t('agent.editor.miniToolsSelected') }}</t-radio-button>
+                <t-radio-button value="none">{{ $t('agent.editor.miniToolsNone') }}</t-radio-button>
+              </t-radio-group>
+              <div class="sandbox-select-links">
+                <a href="javascript:void(0)" class="go-settings-link" @click.prevent="openMiniToolSettings">
+                  {{ $t('agent.editor.goMiniToolSettings') }}
+                </a>
+              </div>
+              <p v-if="miniToolOptions.length === 0" class="desc empty-hint">
+                {{ $t('agent.editor.miniToolsEmpty') }}
+              </p>
+            </div>
+          </div>
+
+          <div v-if="miniToolsSelectionMode === 'selected' && miniToolOptions.length > 0"
+            class="setting-row setting-row-vertical">
+            <div class="setting-control setting-control-full">
+              <t-checkbox-group v-model="formData.config.selected_mini_tools" class="skill-pick-list">
+                <section v-for="group in miniToolGroups" :key="group.key" class="skill-pick-group">
+                  <header class="skill-pick-group__header">
+                    <span class="skill-pick-group__bar" />
+                    <span class="skill-pick-group__title">{{ group.label }}</span>
+                    <span class="skill-pick-group__count">{{ group.tools.length }}</span>
+                  </header>
+                  <article v-for="tool in group.tools" :key="tool.id" class="skill-pick skill-pick--ready">
+                    <t-checkbox :value="tool.id" class="skill-pick__check" />
+                    <div class="skill-pick__badge" aria-hidden="true">{{ tool.icon || '🧮' }}</div>
+                    <div class="skill-pick__body">
+                      <div class="skill-pick__title-row">
+                        <span class="skill-name" :title="tool.name">{{ tool.name }}</span>
+                        <span class="mini-tool-category">{{ tool.category }}</span>
+                      </div>
+                      <p v-if="tool.description" class="skill-desc" :title="tool.description">
+                        {{ tool.description }}
+                      </p>
+                    </div>
+                  </article>
+                </section>
+              </t-checkbox-group>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div v-show="currentSection === 'knowledge'" class="section">
         <div class="section-header">
           <h2>{{ $t('agent.editor.knowledgeConfig') }}</h2>
@@ -1838,12 +1902,19 @@
       <t-button variant="outline" @click="modalShell.requestClose">
         {{ props.readOnly ? $t('common.close') : $t('common.cancel') }}
       </t-button>
+      <t-button v-if="!props.readOnly && editorAgent?.id" variant="outline" :disabled="editorInitializing"
+        @click="showDryRun = true">
+        {{ $t('agent.dryRun.title') }}
+      </t-button>
       <t-button v-if="!props.readOnly" theme="primary" data-guide="agent-create-submit" :loading="saving"
         :disabled="editorInitializing" @click="handleSave">
         {{ saveButtonLabel }}
       </t-button>
     </template>
   </SettingsModalShell>
+
+  <AgentDryRunDrawer v-model:visible="showDryRun" :agent-id="editorAgent?.id" :agent-name="formData.name"
+    :draft-config="formData.config" />
 
   <SettingDrawer
     v-model:visible="showSkillProgress"
@@ -1871,6 +1942,7 @@
 </template>
 
 <script setup lang="ts">
+import AgentDryRunDrawer from './AgentDryRunDrawer.vue';
 import { useAssistantDataChange } from '@/utils/assistantDataChange';
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
@@ -1934,6 +2006,7 @@ import { ASSISTANT_ACCESS_LEVELS, type AssistantAccessLevel } from '@/api/assist
 import { getRootZoom, rectToCssPx } from '@/utils/zoom';
 import { integrationSectionKey } from '@/config/settingsRoute';
 import { toolboxLocation } from '@/config/toolbox';
+import { listMiniTools, type MiniTool } from '@/api/minitool';
 import {
   deriveKbFilterFromTools,
   type RequirementMissKind,
@@ -2109,6 +2182,7 @@ const onAgentEditorFocusSection = (event: Event) => {
 
 onMounted(() => {
   window.addEventListener(AGENT_EDITOR_FOCUS_SECTION_EVENT, onAgentEditorFocusSection)
+  void loadMiniToolOptions()
 })
 
 onBeforeUnmount(() => {
@@ -2168,6 +2242,44 @@ const skillCatalog = ref<SkillCatalogItem[]>([]);
 const catalogReady = ref(false);
 const installingCatalogId = ref('');
 const skillsSelectionMode = ref<'all' | 'selected' | 'none'>('none');
+
+// 小工具卡片：与技能不同，卡片是空间级资源，不依赖沙箱，智能体按 id 绑定。
+const miniToolOptions = ref<MiniTool[]>([]);
+const miniToolsSelectionMode = computed<'all' | 'selected' | 'none'>(() =>
+  (formData.value.config.mini_tools_selection_mode as 'all' | 'selected' | 'none') || 'none');
+const miniToolGroups = computed(() => {
+  const groups = new Map<string, MiniTool[]>();
+  for (const tool of miniToolOptions.value) {
+    const key = tool.category || '其他';
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(tool);
+    else groups.set(key, [tool]);
+  }
+  return Array.from(groups.entries()).map(([key, tools]) => ({ key, label: key, tools }));
+});
+
+async function loadMiniToolOptions() {
+  try {
+    const response = await listMiniTools();
+    miniToolOptions.value = response.data ?? [];
+  } catch {
+    miniToolOptions.value = [];
+  }
+}
+
+function onMiniToolsModeChange(value: string | number | boolean) {
+  const mode = (value === 'all' || value === 'selected') ? value : 'none';
+  formData.value.config.mini_tools_selection_mode = mode;
+  if (mode !== 'selected') {
+    formData.value.config.selected_mini_tools = [];
+  }
+}
+
+function openMiniToolSettings() {
+  modalShell.requestClose(() => {
+    void router.push(toolboxLocation('minitools'));
+  });
+}
 const hostOnly = computed(() => hostSkillsOnly(
   deploymentCapabilities.isSupported('settings.sandbox.remote'),
   deploymentCapabilities.isSupported('settings.sandbox.host'),
@@ -2251,6 +2363,19 @@ const catalogSkillGroups = computed(() => {
   }
   return groups
 })
+
+// Risk is shown before the operator binds a skill, not only in settings: the
+// decision that matters is which capability the agent may use. Unknown values
+// read as medium, matching the backend's normalization.
+const SKILL_RISK_KEYS = ['low', 'medium', 'high', 'critical']
+
+function skillRiskLevel(skill: CatalogSkillRow): string {
+  return skill.risk_level && SKILL_RISK_KEYS.includes(skill.risk_level) ? skill.risk_level : 'medium'
+}
+
+function skillRiskText(level: string): string {
+  return t(`settings.skills.governance.risk.${level}`)
+}
 
 function skillStatusHint(skill: CatalogSkillRow): string {
   if (!skill.installed) return t('agent.editor.skillNotInstalled')
@@ -2851,6 +2976,7 @@ const navItems = computed(() => {
     items.push({ key: 'tools', icon: 'tools', label: t('agent.editor.toolsConfig') });
     items.push({ key: 'mcp', icon: 'server', label: t('agentEditor.mcp.label') });
     items.push({ key: 'skills', icon: SKILL_ICON, label: t('agent.editor.skillsConfig') });
+    items.push({ key: 'minitools', icon: 'app', label: t('agent.editor.miniToolsConfig') });
   }
   // 发布（仅编辑模式）
   if (editorMode.value === 'edit' && editorAgent.value?.id && !editorAgent.value?.is_builtin && !authStore.isLiteMode) {
@@ -2878,7 +3004,7 @@ const navGroups = computed(() => {
     {
       key: 'capability',
       label: t('agentEditor.navGroups.capability'),
-      items: pickItems(['multimodal', 'tools', 'mcp', 'skills']),
+      items: pickItems(['multimodal', 'tools', 'mcp', 'skills', 'minitools']),
     },
     {
       key: 'integration',
@@ -2921,6 +3047,9 @@ const defaultFormData = {
     // Skills 设置
     skills_selection_mode: 'none' as 'all' | 'selected' | 'none',
     selected_skills: [] as string[],
+    // 小工具绑定：默认不携带，卡片按 id 引用，改了卡片内容无需改智能体。
+    mini_tools_selection_mode: 'none' as 'all' | 'selected' | 'none',
+    selected_mini_tools: [] as string[],
     // 技能脚本运行在哪份空间沙箱配置上。留空表示禁用脚本执行。
     sandbox_config_id: '' as string,
     // 知识库设置：新建智能体默认选择 "全部知识库"，
@@ -3004,6 +3133,7 @@ const defaultFormData = {
 };
 
 const formData = ref(JSON.parse(JSON.stringify(defaultFormData)));
+const showDryRun = ref(false);
 
 const starterSuggestionModeOptions = computed(() => [
   { value: 'curated', label: t('agentEditor.questionSuggestions.modeCurated') },
@@ -3670,6 +3800,7 @@ watch(() => props.visible, async (val) => {
       }
       if (!agentData.config.access_level) agentData.config.access_level = 'auto_write';
       if (!agentData.config.selected_skills) agentData.config.selected_skills = [];
+      if (!agentData.config.selected_mini_tools) agentData.config.selected_mini_tools = [];
       if (!agentData.config.supported_file_types) agentData.config.supported_file_types = [];
       if (!agentData.config.chat_parser_engine_rules) agentData.config.chat_parser_engine_rules = [];
       // 附件解析调优字段：旧数据缺省时置 0（表示使用全局默认）
@@ -6331,6 +6462,35 @@ const handleSave = async () => {
 
 .skill-pick__hint--upgrade {
   color: var(--td-warning-color);
+}
+
+// Compact risk pill on each bindable skill. Text, not just colour, so the
+// level survives greyscale printing and colour-blind readers.
+.skill-pick__risk {
+  flex-shrink: 0;
+  padding: 0 5px;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: var(--app-radius-sm);
+  font-size: var(--app-text-xs);
+  line-height: 15px;
+  color: var(--td-text-color-placeholder);
+  white-space: nowrap;
+}
+
+.skill-pick__risk--medium {
+  border-color: color-mix(in srgb, var(--td-warning-color) 38%, transparent);
+  color: var(--td-warning-color);
+}
+
+.skill-pick__risk--high,
+.skill-pick__risk--critical {
+  border-color: color-mix(in srgb, var(--td-error-color) 38%, transparent);
+  background: color-mix(in srgb, var(--td-error-color) 8%, transparent);
+  color: var(--td-error-color);
+}
+
+.skill-pick__risk--critical {
+  font-weight: 600;
 }
 
 .skill-pick__hint--busy {

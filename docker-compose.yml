@@ -40,6 +40,10 @@ services:
       dockerfile: docker/Dockerfile.app
       args:
         - APK_MIRROR_ARG=${APK_MIRROR_ARG:-}
+        # Go 模块代理。留空时 Dockerfile 回退到 proxy.golang.org；在无法直连
+        # 的环境里设成 https://goproxy.cn,direct 之类的镜像，否则构建会在
+        # `go install migrate` 这一步失败。
+        - GOPROXY_ARG=${GOPROXY_ARG:-}
         - WITH_ANYDOC=${WITH_ANYDOC:-1}
         # Build metadata shown on the system-info page. start_all.sh injects
         # these from git and the VERSION file; with a plain `docker compose
@@ -58,7 +62,7 @@ services:
       # Docker 沙箱默认关闭（见 WEKNORA_SANDBOX_DOCKER_ENABLED）。需要本机 daemon 时
       # 同时设 true 并挂载实际 socket——这等同宿主机 root，仅私有化单机。
       # 入口脚本会按 socket GID 把 appuser 加入对应组（compose group_add 在 gosu 后无效）。
-      # - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock
       # Optional: declarative built-in models. Copy config/builtin_models.yaml.example
       # to config/builtin_models.yaml, edit it for your deployment, then
       # uncomment the line below. See website-docs/03-features/06-models.md.

@@ -22,6 +22,11 @@ export const SETTINGS_SECTION_MIN_ROLE: Record<string, SettingsRoleKey> = {
   // that config boots. Same Admin+ bar as the sandbox editor itself.
   skills: 'admin',
   mcp: 'admin',
+  // Cards are readable by everyone; creating and editing them needs
+  // Contributor, which the panel and the backend both enforce.
+  minitools: 'viewer',
+  // 只读查询工具，没有写操作，所有成员都能用。
+  reservoir: 'viewer',
   system: 'viewer',
   userprofile: 'viewer',
   browserconnection: 'viewer',

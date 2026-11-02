@@ -3,7 +3,9 @@ package handler
 import (
 	"context"
 	"net/http"
+	"strings"
 
+	"github.com/Tencent/WeKnora/internal/agent/skills"
 	"github.com/Tencent/WeKnora/internal/application/access"
 	"github.com/Tencent/WeKnora/internal/application/service"
 	// Referenced only by the @Failure annotations (errors.AppError); swag
@@ -34,6 +36,7 @@ type SkillHandler struct {
 type skillCatalogService interface {
 	ListCatalog(ctx context.Context, tenantID uint64) ([]service.SkillCatalogView, error)
 	RegisterCatalogFromArchive(ctx context.Context, tenantID uint64, archive []byte) (*types.TenantSkillCatalogEntity, error)
+	RegisterCatalogsFromArchive(ctx context.Context, tenantID uint64, archive []byte) ([]*types.TenantSkillCatalogEntity, error)
 	RegisterCatalogFromSource(ctx context.Context, tenantID uint64, source string) (*types.TenantSkillCatalogEntity, error)
 	InstallCatalogToConfigs(ctx context.Context, tenantID uint64, catalogID string, configIDs []string) (*service.CatalogInstallResult, error)
 	DeleteCatalog(ctx context.Context, tenantID uint64, catalogID string) error
@@ -59,6 +62,13 @@ func NewSkillHandler(
 type SkillInfoResponse struct {
 	Name        string `json:"name" extensions:"x-agent"`
 	Description string `json:"description" extensions:"x-agent"`
+	// Governance metadata for the picker. Category is safe | read_local |
+	// read_remote | write | unclassified; RiskLevel is low | medium | high |
+	// critical. Both are always populated so the UI need not guess.
+	Category   string   `json:"category" extensions:"x-agent"`
+	RiskLevel  string   `json:"risk_level" extensions:"x-agent"`
+	Keywords   []string `json:"keywords,omitempty"`
+	PromptHint string   `json:"prompt_hint,omitempty"`
 }
 
 // ListSkills godoc
@@ -125,6 +135,10 @@ func (h *SkillHandler) ListSkills(c *gin.Context) {
 		response = append(response, SkillInfoResponse{
 			Name:        row.Name,
 			Description: row.Description,
+			Category:    normalizeSkillCategory(row.Category),
+			RiskLevel:   normalizeSkillRiskLevel(row.RiskLevel),
+			Keywords:    splitSkillKeywords(row.Keywords),
+			PromptHint:  row.PromptHint,
 		})
 	}
 
@@ -133,4 +147,32 @@ func (h *SkillHandler) ListSkills(c *gin.Context) {
 		"data":             response,
 		"skills_available": true,
 	})
+}
+
+// normalizeSkillCategory maps a stored value onto the vocabulary the UI
+// renders. Rows installed before governance metadata existed are empty and
+// become unclassified, which the badge shows as "未分类" rather than as safe.
+func normalizeSkillCategory(raw string) string {
+	return skills.NormalizeSkillCategory(raw)
+}
+
+// normalizeSkillRiskLevel reports medium for an unlabelled skill: an operator
+// can lower it deliberately, but silence must not read as harmless.
+func normalizeSkillRiskLevel(raw string) string {
+	return skills.NormalizeSkillRiskLevel(raw)
+}
+
+func splitSkillKeywords(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part = strings.TrimSpace(part); part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
 }

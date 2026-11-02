@@ -515,3 +515,70 @@ func TestListSkillZipFilesDoesNotInflateBodies(t *testing.T) {
 	_, err = readSkillZipFile(data, "missing.txt")
 	require.ErrorIs(t, err, errSkillFileMissing)
 }
+
+func TestParseSkillBundles(t *testing.T) {
+	t.Run("splits a multi-skill zip one directory per skill", func(t *testing.T) {
+		archive := zipBundle(t, map[string]string{
+			"skillA/SKILL.md": "---\nname: skill-a\ndescription: A\n---\nuse skill-a",
+			"skillA/run.py":   "print('a')\n",
+			// No frontmatter name: the directory name becomes the skill name.
+			"skillB/SKILL.md": "---\ndescription: B\n---\nuse skill-b",
+			"skillB/tool.sh":  "echo b\n",
+			// Outside every skill directory: dropped like a repo README.
+			"README.md": "repo readme",
+		})
+
+		bundles, err := ParseSkillBundles(archive)
+		require.NoError(t, err)
+		require.Len(t, bundles, 2)
+		require.Equal(t, "skill-a", bundles[0].Name)
+		require.Equal(t, "skillB", bundles[1].Name)
+		require.Contains(t, bundles[0].Files, "run.py")
+		require.Contains(t, bundles[1].Files, "tool.sh")
+		require.NotContains(t, bundles[0].Files, "README.md")
+		require.NotContains(t, bundles[1].Files, "README.md")
+		// Each bundle digests its own repacked archive, so the two digests differ.
+		require.NotEqual(t, bundles[0].SHA256, bundles[1].SHA256)
+	})
+
+	t.Run("accepts a single flat skill", func(t *testing.T) {
+		archive := zipBundle(t, map[string]string{
+			"SKILL.md": validSkillMD,
+			"run.py":   "print(1)\n",
+		})
+
+		bundles, err := ParseSkillBundles(archive)
+		require.NoError(t, err)
+		require.Len(t, bundles, 1)
+		require.Equal(t, "pdf-tools", bundles[0].Name)
+		require.Contains(t, bundles[0].Files, "run.py")
+	})
+
+	t.Run("walks through a single wrapper directory", func(t *testing.T) {
+		archive := zipBundle(t, map[string]string{
+			"bundle/skillA/SKILL.md": "---\nname: skill-a\n---\nbody",
+			"bundle/skillB/SKILL.md": "---\nname: skill-b\n---\nbody",
+		})
+
+		bundles, err := ParseSkillBundles(archive)
+		require.NoError(t, err)
+		require.Len(t, bundles, 2)
+		require.Equal(t, "skill-a", bundles[0].Name)
+		require.Equal(t, "skill-b", bundles[1].Name)
+	})
+
+	t.Run("rejects an archive with no skill", func(t *testing.T) {
+		archive := zipBundle(t, map[string]string{
+			"docs/readme.md": "nothing here",
+		})
+
+		_, err := ParseSkillBundles(archive)
+		require.ErrorIs(t, err, ErrSkillBundleInvalid)
+		require.ErrorContains(t, err, "no skill")
+	})
+
+	t.Run("rejects malformed zip input", func(t *testing.T) {
+		_, err := ParseSkillBundles([]byte("not a zip"))
+		require.ErrorIs(t, err, ErrSkillBundleInvalid)
+	})
+}

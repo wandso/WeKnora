@@ -201,6 +201,16 @@ func (f *fakeSandboxSkillService) InstallSkill(
 	return f.installID, f.installErr
 }
 
+func (f *fakeSandboxSkillService) InstallSkills(
+	_ context.Context, tenantID uint64, configID string, archive []byte,
+) ([]string, error) {
+	f.installTenant, f.installConfig, f.installBytes = tenantID, configID, archive
+	if f.installErr != nil {
+		return nil, f.installErr
+	}
+	return []string{f.installID}, nil
+}
+
 func (f *fakeSandboxSkillService) InstallSkillFromSource(
 	_ context.Context, tenantID uint64, configID, source string,
 ) (string, error) {

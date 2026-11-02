@@ -318,6 +318,34 @@ func renderPromptPlaceholders(template string, knowledgeBases []*KnowledgeBaseIn
 	return result
 }
 
+// formatMiniToolsPrompt renders the 小工具 cards attached to a turn. Unlike a
+// skill, a card is already fully expanded: its formula, inputs and domain
+// knowledge are safe to use directly, so no read_file step is implied.
+//
+// The cards are ordered by the caller, and the closing instruction is what
+// keeps the model from inventing a missing input.
+func formatMiniToolsPrompt(tools []*types.MiniTool) string {
+	if len(tools) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("Attached mini tools (小工具): the user explicitly attached these preset cards to " +
+		"this request. Apply the matching card's method instead of improvising one. Ask for a " +
+		"missing required input rather than inventing a value, and show the substituted numbers " +
+		"so the result can be checked.\n")
+	for _, tool := range tools {
+		if tool == nil {
+			continue
+		}
+		b.WriteString("\n--- ")
+		b.WriteString(tool.Name)
+		b.WriteString(" ---\n")
+		b.WriteString(tool.RenderPrompt())
+		b.WriteString("\n")
+	}
+	return b.String()
+}
+
 // formatSkillsMetadata formats skills metadata for the system prompt (Level 1 - Progressive Disclosure)
 // This is a lightweight representation that only includes skill name and description
 func formatSkillsMetadata(skillsMetadata []*skills.SkillMetadata, shellExecEnabled bool) string {
@@ -546,8 +574,11 @@ func renderPromptPlaceholdersWithStatus(
 
 // BuildSystemPromptOptions contains optional parameters for BuildSystemPrompt
 type BuildSystemPromptOptions struct {
-	SelectedTools    []string // Actual registered tools for this turn, after capability filtering
-	SkillsMetadata   []*skills.SkillMetadata
+	SelectedTools  []string // Actual registered tools for this turn, after capability filtering
+	SkillsMetadata []*skills.SkillMetadata
+	// MiniToolsPrompt is the already-rendered text of the 小工具 cards attached
+	// to this turn; empty means no card.
+	MiniToolsPrompt  string
 	ShellExecEnabled bool
 	SkillInstallMode bool
 	Language         string         // User language name for {{language}} placeholder (e.g. "Chinese (Simplified)")
@@ -666,6 +697,11 @@ func BuildSystemPromptSections(
 			sections = append(sections, SystemPromptSection{
 				"skills", formatSkillsMetadata(options.SkillsMetadata, options.ShellExecEnabled),
 			})
+		}
+		if options.MiniToolsPrompt != "" {
+			// After the skills directory: a card is concrete, already-expanded
+			// guidance, so it reads after the descriptive skill index.
+			sections = append(sections, SystemPromptSection{"mini_tools", options.MiniToolsPrompt})
 		}
 		sections = append(sections, SystemPromptSection{"memory", options.MemoryPrompt},
 			SystemPromptSection{"protocol", options.ProtocolPrompt})

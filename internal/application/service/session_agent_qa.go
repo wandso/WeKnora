@@ -597,6 +597,24 @@ func (s *sessionService) buildAgentConfig(
 			skillConfigID, len(tenantSkills))
 	}
 
+	// 小工具: the agent's saved selection is the base, cards attached to this
+	// turn are added on top. A stored id the caller can no longer read is
+	// dropped by the resolver, so a deleted or privatised card injects nothing
+	// rather than leaking its content.
+	if s.miniTools != nil {
+		mode := customAgent.Config.MiniToolsSelectionMode
+		selected := customAgent.Config.SelectedMiniTools
+		agentConfig.MiniTools = s.miniTools.ListForRun(ctx, agentTenantID, mode, selected, req.MiniToolIDs)
+		if len(agentConfig.MiniTools) > 0 {
+			ids := make([]string, 0, len(agentConfig.MiniTools))
+			for _, tool := range agentConfig.MiniTools {
+				ids = append(ids, tool.ID)
+			}
+			s.miniTools.MarkUsed(ctx, agentTenantID, ids)
+			logger.Infof(ctx, "Injecting %d mini tool(s) into this run (mode=%s)", len(ids), mode)
+		}
+	}
+
 	// Resolve knowledge bases using shared helper
 	kbIDs, knowledgeIDs, err := s.resolveKnowledgeBases(ctx, req)
 	if err != nil {

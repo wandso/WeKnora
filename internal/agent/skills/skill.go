@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"strings"
 	"unicode/utf8"
+
+	"gopkg.in/yaml.v3"
 )
 
 // Skill validation constants following Claude's specification
@@ -47,6 +49,20 @@ type Skill struct {
 	// ("word-docx"). When name is not a valid install identity, slug wins.
 	Slug string `yaml:"slug,omitempty"`
 
+	// Governance metadata. These are optional in SKILL.md: an archive written
+	// for any other agent runtime installs unchanged, and the catalog then
+	// classifies it as unclassified / medium instead of refusing it. The values
+	// drive the risk badges and category filter in the toolbox, and are shown
+	// next to a skill when an agent picks one.
+	//
+	// Category describes the side effect a skill can have (safe, read_local,
+	// read_remote, write); RiskLevel is the severity of getting it wrong (low,
+	// medium, high, critical). Keywords are extra discovery hints.
+	Category   string        `yaml:"category,omitempty"`
+	RiskLevel  string        `yaml:"risk_level,omitempty"`
+	Keywords   SkillKeywords `yaml:"keywords,omitempty"`
+	PromptHint string        `yaml:"prompt_hint,omitempty"`
+
 	// Filesystem information
 	BasePath string // Absolute path to the skill directory
 	FilePath string // Absolute path to SKILL.md
@@ -68,6 +84,49 @@ type SkillMetadata struct {
 	Name        string
 	Description string
 	BasePath    string // Path to skill directory for later loading
+	Category    string
+	RiskLevel   string
+	Keywords    []string
+	PromptHint  string
+}
+
+// SkillKeywords accepts both a YAML sequence and a comma-separated scalar.
+// Third-party SKILL.md files use both spellings; a strict []string would make
+// the whole frontmatter fail to parse, which reads to the user as an
+// uninstallable skill rather than a one-line metadata nit.
+type SkillKeywords []string
+
+// UnmarshalYAML implements yaml.Unmarshaler.
+func (k *SkillKeywords) UnmarshalYAML(value *yaml.Node) error {
+	if value == nil {
+		return nil
+	}
+	if value.Kind == yaml.ScalarNode {
+		var raw string
+		if err := value.Decode(&raw); err != nil {
+			return err
+		}
+		out := make(SkillKeywords, 0, 4)
+		for _, part := range strings.Split(raw, ",") {
+			if part = strings.TrimSpace(part); part != "" {
+				out = append(out, part)
+			}
+		}
+		*k = out
+		return nil
+	}
+	var list []string
+	if err := value.Decode(&list); err != nil {
+		return err
+	}
+	out := make(SkillKeywords, 0, len(list))
+	for _, item := range list {
+		if item = strings.TrimSpace(item); item != "" {
+			out = append(out, item)
+		}
+	}
+	*k = out
+	return nil
 }
 
 // SkillFile represents an additional file within a skill directory (Level 3)
@@ -153,7 +212,81 @@ func (s *Skill) ToMetadata() *SkillMetadata {
 		Name:        s.Name,
 		Description: s.Description,
 		BasePath:    s.BasePath,
+		Category:    s.NormalizedCategory(),
+		RiskLevel:   s.NormalizedRiskLevel(),
+		Keywords:    []string(s.Keywords),
+		PromptHint:  s.PromptHint,
 	}
+}
+
+// Skill governance vocabularies. They mirror the AIOps skill catalog so
+// operators moving between the two products read the same words.
+const (
+	SkillCategorySafe         = "safe"
+	SkillCategoryReadLocal    = "read_local"
+	SkillCategoryReadRemote   = "read_remote"
+	SkillCategoryWrite        = "write"
+	SkillCategoryUnclassified = "unclassified"
+
+	SkillRiskLow      = "low"
+	SkillRiskMedium   = "medium"
+	SkillRiskHigh     = "high"
+	SkillRiskCritical = "critical"
+)
+
+// NormalizeSkillCategory maps a free-form frontmatter value onto the known set.
+// Unknown or empty values become unclassified rather than guessing "safe":
+// a badge that overstates safety is worse than one that admits ignorance.
+//
+// It is exported as a free function because stored rows and read models carry
+// the raw string without a parsed Skill around it.
+func NormalizeSkillCategory(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case SkillCategorySafe:
+		return SkillCategorySafe
+	case SkillCategoryReadLocal:
+		return SkillCategoryReadLocal
+	case SkillCategoryReadRemote:
+		return SkillCategoryReadRemote
+	case SkillCategoryWrite:
+		return SkillCategoryWrite
+	default:
+		return SkillCategoryUnclassified
+	}
+}
+
+// NormalizeSkillRiskLevel maps a free-form frontmatter value onto the known set.
+// Empty becomes medium: the operator can always lower it, but an unlabelled
+// skill should not present itself as harmless.
+func NormalizeSkillRiskLevel(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case SkillRiskLow:
+		return SkillRiskLow
+	case SkillRiskMedium:
+		return SkillRiskMedium
+	case SkillRiskHigh:
+		return SkillRiskHigh
+	case SkillRiskCritical:
+		return SkillRiskCritical
+	default:
+		return SkillRiskMedium
+	}
+}
+
+// NormalizedCategory is the Skill-level form of NormalizeSkillCategory.
+func (s *Skill) NormalizedCategory() string {
+	if s == nil {
+		return SkillCategoryUnclassified
+	}
+	return NormalizeSkillCategory(s.Category)
+}
+
+// NormalizedRiskLevel is the Skill-level form of NormalizeSkillRiskLevel.
+func (s *Skill) NormalizedRiskLevel() string {
+	if s == nil {
+		return SkillRiskMedium
+	}
+	return NormalizeSkillRiskLevel(s.RiskLevel)
 }
 
 // ParseSkillFile parses a SKILL.md file content and extracts metadata and body

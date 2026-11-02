@@ -159,6 +159,9 @@ type AgentConfig struct {
 	// invoke. Runtime only: it is derived per turn from the config the agent
 	// selected, never stored on the agent record.
 	TenantSkills []*TenantSkillEntity `json:"-"`
+	// MiniTools are the 小工具 cards this turn injects, already narrowed by the
+	// agent's selection and the caller's per-turn mentions. Runtime only.
+	MiniTools []*MiniTool `json:"-"`
 	// Per-request @mention pins (runtime only; injected as <must_use> in the user message).
 	PinnedMCPServiceIDs []string `json:"-"`
 	PinnedSkillNames    []string `json:"-"`

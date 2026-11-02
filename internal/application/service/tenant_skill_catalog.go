@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/Tencent/WeKnora/internal/agent/skills"
 	apperrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/sandbox"
@@ -64,6 +65,14 @@ type SkillCatalogView struct {
 	Installations []SkillCatalogInstallView `json:"installations"`
 	// InstalledOn lists the sandbox config ids of Installations.
 	InstalledOn []string `json:"installed_on" extensions:"x-agent"`
+	// Governance metadata, lifted from a representative installation because
+	// it is parsed from SKILL.md and therefore stored per install row. The
+	// settings page needs it before any install is opened, so it has to travel
+	// with the definition.
+	Category   string   `json:"category"`
+	RiskLevel  string   `json:"risk_level"`
+	Keywords   []string `json:"keywords,omitempty"`
+	PromptHint string   `json:"prompt_hint,omitempty"`
 }
 
 // ListCatalog returns every workspace skill definition and which sandbox
@@ -178,7 +187,52 @@ func catalogView(
 	for _, row := range installs {
 		view.Installations = append(view.Installations, installView(row, configByID))
 	}
+	view.Category, view.RiskLevel, view.Keywords, view.PromptHint = skillGovernanceFrom(installs)
 	return view
+}
+
+// skillGovernanceFrom picks the governance metadata of the install the operator
+// will actually run: a ready one if present, otherwise the newest row. Rows of
+// the same catalog skill share a SKILL.md, so any of them would normally do;
+// preferring a ready row keeps the badge correct while a reinstall is in flight.
+func skillGovernanceFrom(installs []*types.TenantSkillEntity) (string, string, []string, string) {
+	var picked *types.TenantSkillEntity
+	for _, row := range installs {
+		if row == nil {
+			continue
+		}
+		if picked == nil || (row.Status == types.SkillStatusReady && picked.Status != types.SkillStatusReady) {
+			picked = row
+			if row.Status == types.SkillStatusReady {
+				break
+			}
+		}
+	}
+	if picked == nil {
+		return skills.SkillCategoryUnclassified, skills.SkillRiskMedium, nil, ""
+	}
+	return skills.NormalizeSkillCategory(picked.Category),
+		skills.NormalizeSkillRiskLevel(picked.RiskLevel),
+		splitSkillKeywords(picked.Keywords),
+		picked.PromptHint
+}
+
+// splitSkillKeywords undoes the comma-joined form stored on the install row.
+func splitSkillKeywords(raw string) []string {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part = strings.TrimSpace(part); part != "" {
+			out = append(out, part)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func installView(
@@ -218,6 +272,44 @@ func (s *TenantSkillService) RegisterCatalogFromArchive(
 		return nil, err
 	}
 	return s.upsertCatalogFromBundle(ctx, tenantID, bundle, archive, true)
+}
+
+// RegisterCatalogsFromArchive records every skill in a multi-skill archive as
+// its own catalog definition without installing any of them. Each skill is
+// repacked into its own archive so a definition stores and digests only that
+// skill; re-uploading a name that exists updates that definition's bundle.
+func (s *TenantSkillService) RegisterCatalogsFromArchive(
+	ctx context.Context, tenantID uint64, archive []byte,
+) ([]*types.TenantSkillCatalogEntity, error) {
+	bundles, err := ParseSkillBundles(archive)
+	if err != nil {
+		return nil, err
+	}
+	if len(bundles) == 0 {
+		return nil, apperrors.NewBadRequestError("archive holds no skills")
+	}
+	seen := make(map[string]struct{}, len(bundles))
+	for _, bundle := range bundles {
+		if _, dup := seen[bundle.Name]; dup {
+			return nil, apperrors.NewBadRequestError(
+				fmt.Sprintf("archive holds more than one skill named %q", bundle.Name))
+		}
+		seen[bundle.Name] = struct{}{}
+	}
+	cats := make([]*types.TenantSkillCatalogEntity, 0, len(bundles))
+	for _, bundle := range bundles {
+		subArchive, err := zipSkillFiles(bundle.Files)
+		if err != nil {
+			return nil, fmt.Errorf("repack skill %s: %w", bundle.Name, err)
+		}
+		bundle.SHA256 = skillArchiveSHA256(subArchive)
+		cat, err := s.upsertCatalogFromBundle(ctx, tenantID, bundle, subArchive, true)
+		if err != nil {
+			return nil, err
+		}
+		cats = append(cats, cat)
+	}
+	return cats, nil
 }
 
 // RegisterCatalogFromSource fetches a public skill and records it in the catalog.

@@ -74,6 +74,7 @@ func RegisterSandboxConfigRoutes(
 		// this config boots, and the listing names what that image carries.
 		configs.GET("/:id/skills", g.Admin(), skills.List)
 		configs.POST("/:id/skills", g.Admin(), skills.Upload)
+		configs.POST("/:id/skills/multi", g.Admin(), skills.UploadMulti)
 		configs.GET("/:id/skills/:skillId", g.Admin(), skills.Get)
 		configs.GET("/:id/skills/:skillId/files", g.Admin(), skills.ListFiles)
 		configs.GET("/:id/skills/:skillId/files/content", g.Admin(), skills.GetFile)

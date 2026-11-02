@@ -12,6 +12,21 @@ export const TOOLBOX_ITEMS = [
     action: 'settings.skills.addSkill',
   },
   {
+    key: 'minitools',
+    icon: 'app',
+    title: 'miniTools.title',
+    description: 'miniTools.description',
+    action: 'miniTools.create',
+  },
+  {
+    // 内置业务工具：水库水位—库容查算，整页嵌在 iframe 里，避免把
+    // 350 座水库的曲线数据塞进对话上下文。
+    key: 'reservoir',
+    icon: 'chart-line',
+    title: 'reservoirTool.title',
+    description: 'reservoirTool.description',
+  },
+  {
     key: 'mcp',
     icon: 'tools',
     title: 'settings.mcpService',

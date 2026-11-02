@@ -156,6 +156,12 @@ const router = createRouter({
           meta: { requiresInit: true, requiresAuth: true, requiredCapability: 'agents' }
         },
         {
+          path: "agent-ops",
+          name: "agentOps",
+          component: () => import("../views/agent/AgentOps.vue"),
+          meta: { requiresInit: true, requiresAuth: true, requiredCapability: 'agents' }
+        },
+        {
           path: "integrations",
           redirect: (to) => {
             const tab = typeof to.query.tab === 'string' ? to.query.tab : undefined

@@ -1,0 +1,44 @@
+{
+  "probed_at": "2026-10-28T11:17+08:00",
+  "note": "对两个启用中的 MCP 服务做的 OAuth 发现探测，用于评估能否在【不持有 WeKnora 内存储密钥】的情况下，通过标准 OAuth 流程移植到其它 MCP 客户端。",
+  "services": [
+    {
+      "name": "台州水雨情业务查询",
+      "url": "https://10.33.120.178:50216/mcp",
+      "oauth_metadata": "https://10.33.120.178:50216/.well-known/oauth-authorization-server",
+      "authorization_server": {
+        "issuer": "https://10.33.120.178:50216",
+        "authorization_endpoint": "https://10.33.120.178:50216/oauth2/authorize",
+        "token_endpoint": "https://10.33.120.178:50216/oauth2/token",
+        "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post", "none"],
+        "code_challenge_methods_supported": ["S256"],
+        "grant_types_supported": ["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:token-exchange"],
+        "jwks_uri": "https://10.33.120.178:50216/oauth2/jwks",
+        "revocation_endpoint": "https://10.33.120.178:50216/oauth2/revoke",
+        "introspection_endpoint": "https://10.33.120.178:50216/oauth2/introspect"
+      },
+      "pkce_public_client_supported": true,
+      "portability": "可移植：支持 PKCE(S256) + token_endpoint 支持 'none' 认证 → 新客户端可不带 client_secret，重新走授权码流程即可。需 client_id（当前 weknora-mcp-client，若按 public client 注册可直接用，否则需注册新 public client）。"
+    },
+    {
+      "name": "台州人事证书投标助手",
+      "url": "http://10.33.120.178:50310/prod-api/mcp",
+      "is_rfc8707_protected_resource": true,
+      "protected_resource_metadata": "http://10.33.120.178:50310/prod-api/.well-known/oauth-protected-resource",
+      "protected_resource": {
+        "resource": "http://10.33.120.178:50310/prod-api/mcp",
+        "authorization_servers": ["http://10.33.120.178:50310/prod-api"],
+        "bearer_methods_supported": ["header"],
+        "scopes_supported": ["hrm:bidding:mcp"]
+      },
+      "authorization_server_metadata_anonymous_access": false,
+      "portability": "部分可移植：它是 RFC 8707 保护资源（WWW-Authenticate: Bearer resource_metadata=...），理论上也走 OAuth 授权码流程，scope 为 hrm:bidding:mcp；但其授权服务器元数据端点匿名访问返回 401，自动发现可能受阻，需实测授权服务器具体实现。若授权服务器同样支持 PKCE 'none' 则可免密钥接入。"
+    },
+    {
+      "name": "万方文献检索 / WPS 文档转换 / 腾讯文档",
+      "enabled": false,
+      "transport_type": "http",
+      "portability": "当前 WeKnora 版本不支持 http transport（已停用）。万方、腾讯文档无认证；WPS 需要自备 OFDH_API_KEY。与能否取回 WeKnora 内密钥无关（它们未存密钥）。"
+    }
+  ]
+}
