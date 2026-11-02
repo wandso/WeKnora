@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -74,6 +75,12 @@ type SkillBundleParseOptions struct {
 	// AllowNestedSkill accepts a unique SKILL.md nested deeper than one
 	// directory, which is how monorepos and GitHub zipballs arrive.
 	AllowNestedSkill bool
+	// AllowMultipleSkillRoots drops the "exactly one skill root" rule so an
+	// archive that holds several skills side by side (or under one wrapper
+	// directory) is kept whole here and split by directory later, in
+	// ParseSkillBundles. Without it the single-root check rejects the archive
+	// before the splitter ever runs.
+	AllowMultipleSkillRoots bool
 }
 
 // ParseSkillBundle validates an uploaded zip and extracts everything the
@@ -500,10 +507,20 @@ func skillRootPrefix(raw map[string][]byte, opts SkillBundleParseOptions) (strin
 		if subdir != "" {
 			return "", fmt.Errorf("%w: SKILL.md is missing under %q", ErrSkillBundleInvalid, subdir)
 		}
+		// No skill root at the top layer is normal for a multi-skill archive
+		// wrapped in a repo directory: ParseSkillBundles walks down from here.
+		if opts.AllowMultipleSkillRoots {
+			return "", nil
+		}
 		return "", fmt.Errorf("%w: SKILL.md is missing", ErrSkillBundleInvalid)
 	}
 	uniq := uniqueStrings(matches)
 	if len(uniq) > 1 {
+		// Several skills side by side: there is no single root to keep, so
+		// keep everything and let the caller split it per directory.
+		if opts.AllowMultipleSkillRoots {
+			return "", nil
+		}
 		return "", fmt.Errorf("%w: archive holds more than one skill", ErrSkillBundleInvalid)
 	}
 	return uniq[0], nil
@@ -540,6 +557,122 @@ func joinSkillKeywords(keywords []string) string {
 	return strings.Join(out, ",")
 }
 
+// synthesizeSkillFrontmatter fills in the name and description that a
+// community SKILL.md often leaves out before it reaches the strict parser.
+// The directory name supplies the name; the first prose line of the body
+// supplies the description. A file that already declares both is returned
+// byte-for-byte unchanged.
+func synthesizeSkillFrontmatter(manifest []byte, dirName string) []byte {
+	text := string(manifest)
+	body := text
+	front := ""
+	if hasFrontmatterDelimiter(text) {
+		if end := findFrontmatterEnd(text); end >= 0 {
+			front = text[len("---"):end]
+			body = text[end+len("---"):]
+		}
+	}
+
+	needName := !frontmatterHasKey(front, "name")
+	needDesc := !frontmatterHasKey(front, "description")
+	if !needName && !needDesc {
+		return manifest
+	}
+
+	var b strings.Builder
+	b.WriteString("---\n")
+	if needName {
+		b.WriteString("name: " + skillNameFromDir(dirName) + "\n")
+	}
+	b.WriteString(strings.TrimPrefix(strings.TrimPrefix(front, "\r\n"), "\n"))
+	if !strings.HasSuffix(front, "\n") {
+		b.WriteString("\n")
+	}
+	if needDesc {
+		b.WriteString("description: " + quoteForFrontmatter(skillDescriptionFromBody(body, dirName)) + "\n")
+	}
+	b.WriteString("---")
+	b.WriteString(body)
+	return []byte(b.String())
+}
+
+func hasFrontmatterDelimiter(text string) bool {
+	return strings.HasPrefix(text, "---\n") || strings.HasPrefix(text, "---\r\n")
+}
+
+// findFrontmatterEnd returns the offset of the closing "---" line, or -1.
+func findFrontmatterEnd(text string) int {
+	rest := text[3:]
+	for idx := 0; ; {
+		next := strings.Index(rest[idx:], "\n---")
+		if next < 0 {
+			return -1
+		}
+		at := idx + next
+		after := rest[at+4:]
+		if after == "" || strings.HasPrefix(after, "\n") || strings.HasPrefix(after, "\r\n") {
+			return 3 + at + 1 // points at the delimiter itself
+		}
+		idx = at + 4
+	}
+}
+
+func frontmatterHasKey(front, key string) bool {
+	for _, line := range strings.Split(front, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, key+":") {
+			return true
+		}
+	}
+	return false
+}
+
+// skillNameFromDir keeps only the characters the parser accepts, so a
+// directory called "my.skill" still yields a usable name instead of a
+// confusing validation error.
+func skillNameFromDir(dirName string) string {
+	var b strings.Builder
+	for _, r := range dirName {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_':
+			b.WriteRune(r)
+		default:
+			b.WriteRune('-')
+		}
+	}
+	name := strings.Trim(b.String(), "-")
+	if name == "" {
+		return "skill"
+	}
+	return name
+}
+
+// skillDescriptionFromBody takes the first meaningful line of the body: the
+// text after the H1, or failing that the H1 itself. Truncated because the
+// description is also what the agent sees in its skill list.
+func skillDescriptionFromBody(body, dirName string) string {
+	for _, line := range strings.Split(body, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || line == "---" {
+			continue
+		}
+		line = strings.TrimSpace(strings.TrimLeft(line, "#>*- "))
+		if line == "" {
+			continue
+		}
+		line = strings.Join(strings.Fields(line), " ")
+		if runes := []rune(line); len(runes) > 160 {
+			line = string(runes[:160])
+		}
+		return line
+	}
+	return dirName
+}
+
+func quoteForFrontmatter(value string) string {
+	return strconv.Quote(value)
+}
+
 // ParseSkillBundles parses a zip that holds several skills, one per directory.
 // Each candidate directory must contain a SKILL.md; the directory name becomes
 // the skill name when SKILL.md declares none. Files outside every candidate
@@ -550,7 +683,13 @@ func joinSkillKeywords(keywords []string) string {
 // Each bundle is re-rooted and repacked into its own archive, so its SHA256
 // and catalog bytes describe that skill alone instead of the whole upload.
 func ParseSkillBundles(archive []byte) ([]*SkillBundle, error) {
-	raw, err := unzipSkillArchive(archive, SkillBundleParseOptions{AllowExtraFiles: true})
+	// AllowMultipleSkillRoots is what makes a bundle OF skills parse at all:
+	// the single-root rule below is for one skill, and this entry point exists
+	// precisely to handle several.
+	raw, err := unzipSkillArchive(archive, SkillBundleParseOptions{
+		AllowExtraFiles:         true,
+		AllowMultipleSkillRoots: true,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -570,9 +709,15 @@ func ParseSkillBundles(archive []byte) ([]*SkillBundle, error) {
 	bundles := make([]*SkillBundle, 0, len(dirs))
 	for _, dir := range dirs {
 		sub := reRootSkillFiles(raw, dir)
-		if _, ok := sub["SKILL.md"]; !ok {
+		manifest, ok := sub["SKILL.md"]
+		if !ok {
 			return nil, fmt.Errorf("%w: SKILL.md is missing under %q", ErrSkillBundleInvalid, dir)
 		}
+		// Repair the two required fields a community SKILL.md routinely omits.
+		// Doing it here instead of inside skillBundleFromFiles keeps the
+		// single-skill upload strict: there a human can go fix the file, while
+		// a forty-skill archive has nobody to ask.
+		sub["SKILL.md"] = synthesizeSkillFrontmatter(manifest, path.Base(dir))
 		subArchive, err := zipSkillFiles(sub)
 		if err != nil {
 			return nil, fmt.Errorf("%w: repack skill %q: %v", ErrSkillBundleInvalid, dir, err)
