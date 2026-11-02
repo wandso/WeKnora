@@ -1544,6 +1544,7 @@ export default {
     updated: 'Mini tool saved',
     deleted: 'Mini tool deleted',
     duplicated: 'Duplicated as a private copy',
+    visibilityUpdated: 'Visibility updated',
     nameRequired: 'Name is required',
     formulaRequired: 'Provide a formula or domain knowledge',
     variableKeyRequired: 'Every input needs a key',

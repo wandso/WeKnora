@@ -1544,6 +1544,7 @@ export default {
     updated: 'ミニツールを保存しました',
     deleted: 'ミニツールを削除しました',
     duplicated: '非公開のコピーを作成しました',
+    visibilityUpdated: '公開範囲を更新しました',
     nameRequired: '名前を入力してください',
     formulaRequired: '計算式か専門知識のいずれかを入力してください',
     variableKeyRequired: '各変数にキーが必要です',

@@ -205,6 +205,34 @@ func (h *MiniToolHandler) UpdateMiniTool(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": updated})
 }
 
+type setMiniToolVisibilityRequest struct {
+	Visibility string `json:"visibility"`
+}
+
+// SetMiniToolVisibility godoc
+// @Summary      设置小工具可见范围
+// @Description  修改小工具的可见范围，不修改卡片内容。创建者或空间管理员可调用。
+// @Tags         小工具
+// @Accept       json
+// @Produce      json
+// @Param        id    path  string                       true  "小工具 ID"
+// @Param        body  body  setMiniToolVisibilityRequest  true  "可见范围"
+// @Success      200  {object}  map[string]interface{}
+// @Router       /mini-tools/{id}/visibility [put]
+func (h *MiniToolHandler) SetMiniToolVisibility(c *gin.Context) {
+	var req setMiniToolVisibilityRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(apperrors.NewValidationError("Invalid request data").WithDetails(err.Error()))
+		return
+	}
+	tool, err := h.service.SetVisibility(c.Request.Context(), c.Param("id"), req.Visibility)
+	if err != nil {
+		h.fail(c, err, "Failed to update mini tool visibility")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": tool})
+}
+
 // DeleteMiniTool godoc
 // @Summary      删除小工具
 // @Tags         小工具

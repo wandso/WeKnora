@@ -47,6 +47,10 @@ export interface MiniTool {
   usage_count: number
   can_edit: boolean
   can_delete: boolean
+  // Whether the caller may change the visibility. Independent of can_edit:
+  // the shipped catalogue cards cannot be edited in place but an admin can
+  // still publish them.
+  can_share?: boolean
   // Set when the card belongs to another workspace and is visible only because
   // it is public. Read-only for this caller: edit/delete are always false.
   is_foreign?: boolean
@@ -104,6 +108,14 @@ export function updateMiniTool(id: string, payload: Partial<MiniToolPayload>) {
 
 export function deleteMiniTool(id: string) {
   return del<{ success: boolean }>(`/api/v1/mini-tools/${id}`)
+}
+
+/**
+ * Change only the visibility. Unlike updateMiniTool this also works for the
+ * shipped cards, which are not editable in place.
+ */
+export function setMiniToolVisibility(id: string, visibility: MiniToolVisibility) {
+  return put<{ data: MiniTool; success: boolean }>(`/api/v1/mini-tools/${id}/visibility`, { visibility })
 }
 
 export function duplicateMiniTool(id: string) {

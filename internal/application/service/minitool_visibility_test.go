@@ -127,3 +127,44 @@ func TestMiniToolNormalizeVisibility(t *testing.T) {
 		}
 	}
 }
+
+// The shipped catalogue cards have no owner: they are re-seeded on every boot,
+// so their content cannot be edited in place. That must not lock their
+// visibility, otherwise the 108 preset cards could never be published outside
+// their own workspace and the UI had no affordance to change it at all.
+func TestShippedMiniToolCanBeSharedButNotEdited(t *testing.T) {
+	shipped := &types.MiniTool{
+		ID: "card-shipped", TenantID: 1, OwnerUserID: "",
+		Visibility: types.MiniToolVisibilityWorkspace,
+	}
+	decorateMiniTool(shipped, 1, "alice", types.TenantRoleAdmin)
+
+	if shipped.CanEdit || shipped.CanDelete {
+		t.Errorf("a shipped card must not be editable in place, got can_edit=%v can_delete=%v",
+			shipped.CanEdit, shipped.CanDelete)
+	}
+	if !shipped.CanShare {
+		t.Error("a workspace admin must be able to publish a shipped card")
+	}
+
+	// A plain member cannot publish workspace-wide policy either, and a card
+	// belonging to another workspace is never shareable from here.
+	decorateMiniTool(shipped, 1, "bob", types.TenantRoleContributor)
+	if shipped.CanShare {
+		t.Error("a contributor must not change the visibility of an unowned card")
+	}
+	decorateMiniTool(shipped, 2, "carol", types.TenantRoleOwner)
+	if shipped.CanShare {
+		t.Error("a workspace owner must not change the visibility of another workspace's card")
+	}
+
+	// A member's own card stays shareable.
+	mine := &types.MiniTool{
+		ID: "card-mine", TenantID: 1, OwnerUserID: "bob",
+		Visibility: types.MiniToolVisibilityPrivate,
+	}
+	decorateMiniTool(mine, 1, "bob", types.TenantRoleContributor)
+	if !mine.CanShare {
+		t.Error("the creator must be able to change their own card's visibility")
+	}
+}

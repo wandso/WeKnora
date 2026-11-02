@@ -9745,6 +9745,7 @@ export default {
     updated: '小工具已保存',
     deleted: '小工具已删除',
     duplicated: '已复制为副本',
+    visibilityUpdated: '可见范围已更新',
     nameRequired: '请填写名称',
     formulaRequired: '公式和领域知识至少填一项',
     variableKeyRequired: '每个变量都需要变量名',

@@ -33,10 +33,15 @@ type MiniToolRepository interface {
 	// only combination the seeder writes, so a user copying a shipped card
 	// keeps their own row. Returns true when a new card was created.
 	//
-	// Usage counters and the enabled flag of an existing card are preserved:
-	// re-seeding after a catalog update must not reset what the workspace has
-	// done with a card, nor resurrect one an admin deliberately hid.
+	// Usage counters, the enabled flag and the visibility of an existing card
+	// are preserved: re-seeding after a catalog update must not reset what the
+	// workspace has done with a card, nor resurrect one an admin deliberately
+	// hid or un-published.
 	UpsertBuiltin(ctx context.Context, tool *types.MiniTool) (bool, error)
+
+	// SetMiniToolVisibility rewrites only the visibility column of a card in
+	// the given workspace. Returns ErrMiniToolNotFound when the row is gone.
+	SetMiniToolVisibility(ctx context.Context, tenantID uint64, id string, visibility string) error
 }
 
 // MiniToolPatch is a partial update: nil fields keep their stored value.
@@ -65,6 +70,13 @@ type MiniToolService interface {
 	Update(ctx context.Context, id string, patch MiniToolPatch) (*types.MiniTool, error)
 	Delete(ctx context.Context, id string) error
 	Duplicate(ctx context.Context, id string) (*types.MiniTool, error)
+	// SetVisibility changes who can see a card without touching its content.
+	//
+	// Split from Update because the two have different permission rules: a
+	// shipped card cannot be edited in place, yet a workspace admin must still
+	// be able to publish it. Update therefore refuses it, while this method
+	// accepts it.
+	SetVisibility(ctx context.Context, id string, visibility string) (*types.MiniTool, error)
 	// ListForRun resolves the cards one agent turn should inject:
 	// agent selection mode first, then per-turn mentions, always filtered to
 	// enabled cards the workspace can see.

@@ -165,6 +165,30 @@ func (r *miniToolRepository) UpsertBuiltin(
 	existing.Variables = tool.Variables
 	existing.Knowledge = tool.Knowledge
 	existing.Examples = tool.Examples
-	existing.Visibility = tool.Visibility
+	// Visibility is intentionally not refreshed. The shipped default is
+	// "workspace", but an admin may have published the card to the whole
+	// deployment; copying the catalog value back on every seed would silently
+	// un-publish it at the next restart.
 	return false, r.db.WithContext(ctx).Save(&existing).Error
+}
+
+// SetMiniToolVisibility rewrites only the visibility column.
+//
+// A column-level update rather than a full Save: the seeder, a concurrent edit
+// and this call all touch different fields of the same row, and rewriting the
+// whole tuple from a stale in-memory copy would drop their changes.
+func (r *miniToolRepository) SetMiniToolVisibility(
+	ctx context.Context, tenantID uint64, id string, visibility string,
+) error {
+	result := r.db.WithContext(ctx).
+		Model(&types.MiniTool{}).
+		Where("id = ? AND tenant_id = ?", id, tenantID).
+		Update("visibility", visibility)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return interfaces.ErrMiniToolNotFound
+	}
+	return nil
 }

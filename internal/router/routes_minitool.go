@@ -27,6 +27,10 @@ func RegisterMiniToolRoutes(r *gin.RouterGroup, h *handler.MiniToolHandler, g *r
 		// Ownership (creator or Admin+) is checked in the service against the
 		// stored row, which also covers workspace-visible cards.
 		tools.PUT("/:id", g.Contributor(), h.UpdateMiniTool)
+		// Visibility is a workspace-policy switch, not a content edit, so it is
+		// a separate route: the shipped catalogue cards are not editable in
+		// place, yet an admin must still be able to publish them.
+		tools.PUT("/:id/visibility", g.Contributor(), h.SetMiniToolVisibility)
 		tools.DELETE("/:id", g.Contributor(), h.DeleteMiniTool)
 		tools.POST("/:id/duplicate", g.Contributor(), h.DuplicateMiniTool)
 	}

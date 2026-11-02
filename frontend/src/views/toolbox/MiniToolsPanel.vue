@@ -60,15 +60,47 @@
                 <span v-if="!tool.enabled" class="tool-card__disabled">{{ $t('miniTools.disabled') }}</span>
               </div>
             </div>
-            <div v-if="tool.can_edit || tool.can_delete" class="tool-card__actions" @click.stop>
+            <!-- Every card the caller can do something with gets an overflow
+                 menu. The shipped catalogue cards are deliberately not
+                 editable in place, so can_edit alone used to leave them with
+                 no affordance at all — and therefore no way to reach the
+                 visibility switch. can_share covers exactly that gap. -->
+            <div v-if="tool.can_edit || tool.can_share || canCreate" class="tool-card__actions" @click.stop>
               <button v-if="tool.can_edit" type="button" class="icon-btn" :title="$t('common.edit')"
                 :aria-label="$t('common.edit')" @click="openEdit(tool)">
                 <t-icon name="edit" size="14px" />
               </button>
-              <button v-if="tool.can_delete" type="button" class="icon-btn icon-btn--danger"
-                :title="$t('common.delete')" :aria-label="$t('common.delete')" @click="removeTool(tool)">
-                <t-icon name="delete" size="14px" />
-              </button>
+              <t-popup :visible="openMenuToolId === tool.id"
+                @visible-change="(visible: boolean) => setOpenMenu(tool.id, visible)" overlayClassName="card-more-popup"
+                trigger="click" destroy-on-close placement="bottom-right">
+                <button type="button" class="icon-btn" :aria-label="$t('common.expand')"
+                  :aria-expanded="openMenuToolId === tool.id" aria-haspopup="true" @click.stop>
+                  <t-icon name="ellipsis" size="14px" />
+                </button>
+                <template #content>
+                  <div class="popup-menu" @click.stop>
+                    <template v-if="tool.can_share">
+                      <div class="popup-menu-section-title">{{ $t('miniTools.visibility') }}</div>
+                      <div v-for="opt in VISIBILITY_OPTIONS" :key="opt.value" class="popup-menu-item visibility-option"
+                        :class="{ 'is-current': (tool.visibility || 'workspace') === opt.value }"
+                        @click.stop="changeVisibility(tool, opt.value)">
+                        <t-icon class="menu-icon"
+                          :name="(tool.visibility || 'workspace') === opt.value ? 'check' : opt.icon" />
+                        <span>{{ $t(opt.labelKey) }}</span>
+                      </div>
+                      <div class="popup-menu-divider"></div>
+                    </template>
+                    <div v-if="canCreate" class="popup-menu-item" @click.stop="duplicate(tool)">
+                      <t-icon class="menu-icon" name="file-copy" />
+                      <span>{{ $t('miniTools.duplicate') }}</span>
+                    </div>
+                    <div v-if="tool.can_delete" class="popup-menu-item delete" @click.stop="removeTool(tool)">
+                      <t-icon class="menu-icon" name="delete" />
+                      <span>{{ $t('common.delete') }}</span>
+                    </div>
+                  </div>
+                </template>
+              </t-popup>
             </div>
           </div>
           <p class="tool-card__desc">{{ tool.description || $t('miniTools.noDescription') }}</p>
@@ -273,11 +305,13 @@ import {
   duplicateMiniTool,
   listMiniToolCategories,
   listMiniTools,
+  setMiniToolVisibility,
   updateMiniTool,
   type MiniTool,
   type MiniToolExample,
   type MiniToolPayload,
   type MiniToolVariable,
+  type MiniToolVisibility,
 } from '@/api/minitool'
 
 const { t } = useI18n()
@@ -293,6 +327,22 @@ function visibilityLabel(tool: Pick<MiniTool, 'visibility'>): string {
   if (tool.visibility === 'public') return t('miniTools.visibilityPublic')
   if (tool.visibility === 'workspace') return t('miniTools.visibilityWorkspace')
   return t('miniTools.visibilityPrivate')
+}
+
+// Same three levels as the knowledge base menu, so the two catalogs read the
+// same way. Order runs from most private to most visible.
+const VISIBILITY_OPTIONS: Array<{ value: MiniToolVisibility; labelKey: string; icon: string }> = [
+  { value: 'private', labelKey: 'miniTools.visibilityPrivate', icon: 'lock-on' },
+  { value: 'workspace', labelKey: 'miniTools.visibilityWorkspace', icon: 'usergroup' },
+  { value: 'public', labelKey: 'miniTools.visibilityPublic', icon: 'earth' },
+]
+
+// Only one card menu is open at a time; tracking the id keeps the popup
+// controlled, which is what lets the click on an option close it.
+const openMenuToolId = ref('')
+
+function setOpenMenu(id: string, visible: boolean) {
+  openMenuToolId.value = visible ? id : (openMenuToolId.value === id ? '' : openMenuToolId.value)
 }
 
 const loading = ref(true)
@@ -450,6 +500,20 @@ async function duplicate(tool: MiniTool) {
     await duplicateMiniTool(tool.id)
     MessagePlugin.success(t('miniTools.duplicated'))
     detailVisible.value = false
+    await load()
+  } catch (error) {
+    MessagePlugin.error(t('miniTools.saveFailed'))
+  }
+}
+
+async function changeVisibility(tool: MiniTool, visibility: MiniToolVisibility) {
+  openMenuToolId.value = ''
+  if ((tool.visibility || 'workspace') === visibility) return
+  try {
+    await setMiniToolVisibility(tool.id, visibility)
+    MessagePlugin.success(t('miniTools.visibilityUpdated'))
+    // The list carries the server-computed permission flags, so re-read it
+    // instead of patching the row in place.
     await load()
   } catch (error) {
     MessagePlugin.error(t('miniTools.saveFailed'))

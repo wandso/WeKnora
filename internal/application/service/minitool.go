@@ -122,6 +122,25 @@ func canManageMiniTool(tool *types.MiniTool, tenantID uint64, userID string, rol
 	return userID != "" && tool.OwnerUserID == userID
 }
 
+// canShareMiniTool reports whether the caller may change a card's visibility.
+//
+// Looser than canManageMiniTool on purpose: visibility is a workspace policy
+// decision, not a content edit. A shipped card has no owner, so it can never be
+// edited in place — but an admin still has to be able to publish it, otherwise
+// the 108 preset cards could never leave their own workspace.
+func canShareMiniTool(tool *types.MiniTool, tenantID uint64, userID string, role types.TenantRole) bool {
+	if tool == nil {
+		return false
+	}
+	if tenantID == 0 || tool.TenantID != tenantID {
+		return false
+	}
+	if role == types.TenantRoleOwner || role == types.TenantRoleAdmin {
+		return true
+	}
+	return userID != "" && tool.OwnerUserID == userID
+}
+
 func canReadMiniTool(tool *types.MiniTool, tenantID uint64, userID string, role types.TenantRole) bool {
 	if tool == nil {
 		return false
@@ -149,11 +168,13 @@ func decorateMiniTool(tool *types.MiniTool, tenantID uint64, userID string, role
 	tool.CanEdit = manage
 	tool.CanDelete = manage
 	tool.IsForeign = tenantID != 0 && tool.TenantID != tenantID
+	tool.CanShare = canShareMiniTool(tool, tenantID, userID, role)
 	// A published card owned by somebody else is readable but never editable,
 	// even for a workspace admin: write access follows the owning workspace.
 	if tool.IsForeign {
 		tool.CanEdit = false
 		tool.CanDelete = false
+		tool.CanShare = false
 	}
 }
 
@@ -336,6 +357,43 @@ func (s *miniToolService) Delete(ctx context.Context, id string) error {
 		return apperrors.NewForbiddenError("you cannot delete this mini tool")
 	}
 	return miniToolLookupError(s.repo.Delete(ctx, tenantID, id))
+}
+
+// SetVisibility publishes, un-publishes or restricts a card.
+//
+// Deliberately narrower than Update: it only touches the visibility column, so
+// it stays available for shipped cards, which are not editable in place.
+func (s *miniToolService) SetVisibility(
+	ctx context.Context, id string, visibility string,
+) (*types.MiniTool, error) {
+	tenantID, userID, role, err := s.caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	normalized := strings.TrimSpace(visibility)
+	switch normalized {
+	case types.MiniToolVisibilityPrivate,
+		types.MiniToolVisibilityWorkspace,
+		types.MiniToolVisibilityPublic:
+	default:
+		return nil, apperrors.NewValidationError("visibility must be private, workspace or public")
+	}
+	// GetByID is scoped to the caller's workspace, so a foreign public card
+	// resolves to 404 here rather than leaking that it exists under an id the
+	// caller cannot manage.
+	tool, err := s.repo.GetByID(ctx, tenantID, id)
+	if err != nil {
+		return nil, miniToolLookupError(err)
+	}
+	if !canShareMiniTool(tool, tenantID, userID, role) {
+		return nil, apperrors.NewForbiddenError("you cannot change the visibility of this mini tool")
+	}
+	tool.Visibility = normalized
+	if err := s.repo.SetMiniToolVisibility(ctx, tenantID, id, normalized); err != nil {
+		return nil, miniToolLookupError(err)
+	}
+	decorateMiniTool(tool, tenantID, userID, role)
+	return tool, nil
 }
 
 func (s *miniToolService) Duplicate(

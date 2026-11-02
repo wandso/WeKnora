@@ -9607,6 +9607,7 @@ export default {
     updated: '미니 도구를 저장했습니다',
     deleted: '미니 도구를 삭제했습니다',
     duplicated: '비공개 사본으로 복제했습니다',
+    visibilityUpdated: '공개 범위를 업데이트했습니다',
     nameRequired: '이름을 입력하세요',
     formulaRequired: '공식 또는 도메인 지식을 하나 이상 입력하세요',
     variableKeyRequired: '모든 변수에 키가 필요합니다',

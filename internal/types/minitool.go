@@ -156,7 +156,8 @@ type MiniTool struct {
 	Knowledge   string            `json:"knowledge" gorm:"type:text"`
 	Examples    MiniToolExamples  `json:"examples" gorm:"type:text"`
 
-	// Visibility is private (creator only) or workspace (all members read).
+	// Visibility is private (creator only), workspace (all members read) or
+	// public (every workspace reads, write stays with the owning tenant).
 	Visibility string `json:"visibility" gorm:"type:varchar(16);not null;default:'private'"`
 	// Enabled hides a card from the picker without deleting it.
 	Enabled bool `json:"enabled" gorm:"not null;default:true"`
@@ -173,6 +174,15 @@ type MiniTool struct {
 	// CanEdit / CanDelete are computed per request from the caller's role.
 	CanEdit   bool `json:"can_edit" gorm:"-"`
 	CanDelete bool `json:"can_delete" gorm:"-"`
+	// CanShare reports whether the caller may change this card's visibility.
+	//
+	// It is deliberately independent of CanEdit: a product-shipped card has no
+	// owner and must not be edited in place (the seeder would overwrite the
+	// change), but publishing it to the whole deployment is a workspace-level
+	// decision its admins still have to be able to make. Without this flag the
+	// shipped cards were unmanageable, so the UI had no way to reach the
+	// visibility switch at all.
+	CanShare bool `json:"can_share" gorm:"-"`
 	// IsForeign marks a card that belongs to another workspace and is visible
 	// only because it is public. The UI uses it to hide edit affordances and
 	// label the card with its origin instead of pretending it is local.
