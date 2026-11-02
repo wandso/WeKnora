@@ -1,0 +1,5430 @@
+{
+ "version": 1,
+ "source": "水院智算小工具名录.xlsx",
+ "note": "水工/水文/地质专业计算卡片，公式与参数依据现行规范，结果用于方案估算与复核，施工图须按正式计算书与审查意见执行。",
+ "tools": [
+  {
+   "name": "基于DEM流域水文特征提取",
+   "icon": "🗺️",
+   "category": "水文分析",
+   "description": "由栅格 DEM 提取流向、汇流累积量、河网与流域边界，输出流域面积、主河道长度、平均坡度、河网密度等特征值，作为产汇流计算与水文站布设的依据。",
+   "formula": "1) 洼地预处理：填洼（Fill Sinks）消除伪洼地，得到无洼地 DEM；\n2) 流向：D8 单流向法，比较中心格网与 8 个邻域格网的高差，取坡度最陡方向编码 1~128；\n3) 汇流累积量：ACC(i)=1+Σ ACC(上游流入格网)，单位：格网数；\n4) 河网提取：ACC ≥ 阈值 T 的格网判为河道，T 按集水面积 A0 与格网面积 a 换算 T=A0/a；\n5) 流域边界：由出口断面沿流向反向追踪全部上游格网，得流域多边形与面积 F=N·a；\n6) 特征值：主河道长 L 沿河道格网累加；平均坡度 J=Σ(Si·ai)/F；河网密度 D=L/F (km/km²)。",
+   "formula_note": "D8 法在平原区易产生平行流线，宜改用 D-infinity 或多流向算法；汇流阈值直接决定河网密度，需用实测水系或 1:10000 地形图校核；DEM 建议用 5~30 m 分辨率，高程精度优于 1 m。",
+   "variables": [
+    {
+     "key": "dem_resolution",
+     "label": "DEM 格网分辨率",
+     "unit": "m",
+     "required": true,
+     "remark": "5~90，常用 30"
+    },
+    {
+     "key": "drainage_area_threshold",
+     "label": "河网提取集水面积阈值",
+     "unit": "km²",
+     "required": true,
+     "remark": "山区 0.5~5，平原 5~20"
+    },
+    {
+     "key": "outlet_point",
+     "label": "流域出口坐标/断面位置",
+     "unit": "",
+     "required": true,
+     "remark": "经纬度或工程坐标"
+    }
+   ],
+   "knowledge": "依据《水利水电工程测量规范》与《水文站网规划技术导则》；流域特征值是推理公式法、瞬时单位线法推求设计洪水的必备参数，F<50 km² 时面积误差应控制在 5% 以内。",
+   "examples": [
+    {
+     "title": "30 m DEM 提取小流域",
+     "input": "格网 30 m×30 m（a=0.0009 km²），阈值取 2 km²，出口以上统计格网数 N=41 200",
+     "output": "T=2/0.0009≈2222 个格网；F=41200×0.0009=37.1 km²"
+    }
+   ]
+  },
+  {
+   "name": "面雨量权重计算（泰森多边形法）",
+   "icon": "🌧️",
+   "category": "水文分析",
+   "description": "按泰森多边形（最近邻）划分各雨量站的控制面积，计算流域面平均雨量，用于设计暴雨、面雨量预报与洪水预报的输入。",
+   "formula": "1) 在流域图上展绘各雨量站，连接相邻站点构成三角网（Delaunay）；\n2) 作三角网各边的垂直平分线，围成各站控制多边形，裁剪至流域边界；\n3) 量算各站控制面积 Ai 与流域总面积 F，权重 wi=Ai/F，Σwi=1；\n4) 面雨量 P̄=Σ(wi·Pi)；\n5) 精度校核：Σ Ai 与 F 的相对误差应 ≤3%，否则重新剖分。",
+   "formula_note": "泰森多边形法不考虑地形对降水的抬升影响，山区暴雨中心站权重易被低估，宜与等雨量线法、反距离权重法对比；站点迁移或增减后必须重算权重。",
+   "variables": [
+    {
+     "key": "station_areas",
+     "label": "各站控制面积列表",
+     "unit": "km²",
+     "required": true,
+     "remark": "与站点顺序一一对应"
+    },
+    {
+     "key": "station_rainfall",
+     "label": "各站同时段降雨量列表",
+     "unit": "mm",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "basin_area",
+     "label": "流域总面积",
+     "unit": "km²",
+     "required": true,
+     "remark": "用于校核权重之和"
+    }
+   ],
+   "knowledge": "《水利水电工程设计洪水计算规范》SL 44 规定面雨量可采用算术平均、泰森多边形或等雨量线法；泰森多边形法适用于站点较多且分布较均匀的流域。",
+   "examples": [
+    {
+     "title": "三站加权面雨量",
+     "input": "A1=120 km²、P1=82.4 mm；A2=95 km²、P2=96.1 mm；A3=85 km²、P3=71.5 mm；F=300 km²",
+     "output": "w=(0.400,0.317,0.283)；P̄=0.400×82.4+0.317×96.1+0.283×71.5=84.1 mm"
+    }
+   ]
+  },
+  {
+   "name": "P-Ⅲ曲线水文频率计算",
+   "icon": "📈",
+   "category": "水文分析",
+   "description": "对年最大洪峰（或年径流）系列作皮尔逊Ⅲ型频率分析，由均值、Cv、Cs 推求指定频率的设计值，是设计洪水与设计年径流的核心计算。",
+   "formula": "1) 经验频率：连序系列 Pm=m/(n+1)×100%，m 为从大到小排位；\n2) 矩法初估：X̄=(1/n)ΣXi；Cv=(1/X̄)·√[Σ(Xi-X̄)²/(n-1)]；Cs=α·Cv（α 按流域特性取 2~4，初估可取 3）；\n3) 适线：以 X̄、Cv、Cs 查 P-Ⅲ 模比系数 Kp 表，Xp=Kp·X̄，与经验点据比较，调整参数使拟合最优（目估适线或最小二乘）；\n4) 输出：各设计频率（P=1%、2%、5%…）的设计值 Xp；\n5) 成果合理性检查：与上下游、邻近流域成果对比，检查 Cv、Cs 的 regional 规律。",
+   "formula_note": "SL 44 要求系列不少于 30 年，短缺时应插补延长；Cs 不应小于 2Cv（一般 Cs=2~4Cv）；Cs<0 或 Cs>6 时需说明依据；适线应侧重考虑可靠的大洪水点据，不能只追求数学误差最小。",
+   "variables": [
+    {
+     "key": "series",
+     "label": "年最大洪峰（或年径流）系列",
+     "unit": "m³/s 或 万m³",
+     "required": true,
+     "remark": "连续 n 年，n≥30"
+    },
+    {
+     "key": "design_frequencies",
+     "label": "设计频率列表",
+     "unit": "%",
+     "required": true,
+     "remark": "如 1,2,5,10"
+    },
+    {
+     "key": "cv",
+     "label": "变差系数初值",
+     "unit": "",
+     "required": false,
+     "remark": "缺省由矩法计算"
+    },
+    {
+     "key": "cs",
+     "label": "偏态系数或倍比系数 α",
+     "unit": "",
+     "required": false,
+     "remark": "缺省取 3Cv"
+    }
+   ],
+   "knowledge": "《水利水电工程设计洪水计算规范》SL 44、《水利水电工程水文计算规范》SL 278；P-Ⅲ 线型是我国设计洪水规范规定的标准线型，Kp 值可查规范附表，Cs 与 P 双参数查表。",
+   "examples": [
+    {
+     "title": "系列统计与设计值",
+     "input": "n=30，X̄=1250 m³/s，Cv=0.62，取 Cs=3.5Cv=2.17；查表 Kp(1%)=2.86",
+     "output": "Q1%=2.86×1250=3575 m³/s；同法 Kp(2%)=2.51 → Q2%=3138 m³/s"
+    }
+   ]
+  },
+  {
+   "name": "单库调洪演算",
+   "icon": "🌊",
+   "category": "水文分析",
+   "description": "已知入库洪水过程、起调水位与泄流曲线，按水量平衡逐时段演算库水位、库容与下泄流量，确定设计洪水位、校核洪水位与最大下泄流量。",
+   "formula": "1) 水量平衡方程：(Q1+Q2)/2·Δt − (q1+q2)/2·Δt = V2−V1；\n2) 泄流曲线 q=f(Z)（或 q=f(V)）由溢洪道/泄洪洞水力计算给出；\n3) 起调条件：Z1=起调水位（正常蓄水位或汛限水位），V1=V(Z1)，q1=f(Z1)；\n4) 列表试算：假定 q2（或 Z2），由平衡式反求 V2=V1+(Q1+Q2)/2·Δt−(q1+q2)/2·Δt，再查 Z2=Z(V2)，核对 q2=f(Z2)，迭代至收敛；\n5) 逐时段推进，取 q 最大值为 qmax，对应水位为最高洪水位 Zmax；\n6) 有闸控制时按调度规程给定 q(t) 或 Z(t) 约束，改用调洪图解法/数值优化。",
+   "formula_note": "Δt 应≤洪水涨水段历时的 1/5~1/10，常用 1~3 h；无闸溢洪道为自由泄流，有闸需给出启闭规则；库面降水与蒸发一般可忽略，大型水库应计入。",
+   "variables": [
+    {
+     "key": "inflow_hydrograph",
+     "label": "入库洪水过程 Q(t)",
+     "unit": "m³/s",
+     "required": true,
+     "remark": "等时段，给出 Δt"
+    },
+    {
+     "key": "stage_capacity_curve",
+     "label": "水位—库容曲线 Z~V",
+     "unit": "万m³",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "stage_discharge_curve",
+     "label": "水位—泄流曲线 Z~q",
+     "unit": "m³/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "initial_level",
+     "label": "起调水位",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "time_step",
+     "label": "计算时段 Δt",
+     "unit": "h",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水利水电工程设计洪水计算规范》SL 44、《水库调度规程编制导则》SL 706；调洪演算成果直接决定坝顶高程、溢洪道宽度与下游防洪安全，须与泄流能力、库容曲线精度匹配。",
+   "examples": [
+    {
+     "title": "一个时段试算",
+     "input": "Δt=3 h=10800 s，Q1=800、Q2=1600 m³/s，V1=5200 万m³，q1=120 m³/s，试算得 q2=210 m³/s",
+     "output": "ΔV=[(800+1600)/2−(120+210)/2]×10800=1.0397×10⁷ m³≈1039.7 万m³；V2=6239.7 万m³"
+    }
+   ]
+  },
+  {
+   "name": "水库径流还原计算",
+   "icon": "🔄",
+   "category": "水文分析",
+   "description": "把受人类活动影响的实测径流还原为天然径流，消除灌溉、工业生活引水、分洪、蓄水变量等影响，用于径流系列一致性与设计年径流分析。",
+   "formula": "1) 水量平衡还原：W天然=W实测+W农灌+W工业+W生活+W跨流域引出−W跨流域引入+W分洪+ΔW蓄+W蒸发渗漏；\n2) ΔW蓄=W期末−W期初（库容差）；\n3) 农灌还原：W农灌=灌溉面积×灌溉定额/渠系水利用系数；\n4) 逐月/逐年的还原量应与实测引退水记录核对，还原后做年径流系列一致性检验（Mann-Kendall 或双累积曲线）；\n5) 输出还原后的天然年径流系列、均值与 Cv。",
+   "formula_note": "还原计算的关键是引退水资料的完整性；只还原不回归（退水）会高估天然径流；跨流域调水需分别统计引出与引入；还原后应检查水量平衡闭合误差≤5%。",
+   "variables": [
+    {
+     "key": "observed_runoff",
+     "label": "实测年（月）径流量",
+     "unit": "万m³",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "irrigation_water",
+     "label": "农业灌溉引水量",
+     "unit": "万m³",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "industrial_domestic",
+     "label": "工业及生活引水量",
+     "unit": "万m³",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "storage_change",
+     "label": "水库蓄变量（期末−期初）",
+     "unit": "万m³",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "diversion",
+     "label": "跨流域引出（正）/引入（负）",
+     "unit": "万m³",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "return_flow",
+     "label": "回归水量",
+     "unit": "万m³",
+     "required": false,
+     "remark": "灌区退水"
+    }
+   ],
+   "knowledge": "《水利水电工程水文计算规范》SL 278、《水文资料整编规范》SL 247；还原计算是径流系列一致性处理的核心，直接影响可供水量与电站保证出力。",
+   "examples": [
+    {
+     "title": "某年还原",
+     "input": "W实测=8600 万m³，W农灌=1250，W工业生活=380，ΔW蓄=+220，跨流域引出=150，回归水=260",
+     "output": "W天然=8600+1250+380+220+150−260=10340 万m³"
+    }
+   ]
+  },
+  {
+   "name": "平湖法计算",
+   "icon": "🏞️",
+   "category": "水文分析",
+   "description": "把水库简化为水平水面（平湖假定），按库容—泄量关系逐时段作调洪演算，适用于库面宽阔、动库容影响小的水库，是调洪演算的图解简化法。",
+   "formula": "1) 平湖假定：库面水平，动库容忽略，V 仅与坝前水位有关；\n2) 建立 q~V 关系（由 Z~V 与 Z~q 消去 Z 得到）；\n3) 逐时段平衡：(Q1+Q2)/2·Δt=(V2−V1)+(q1+q2)/2·Δt；\n4) 令 S=(V/Δt+q/2)，则 S2=(Q1+Q2)/2+S1−q1，由 q~V 关系试算 q2；\n5) 逐时段推求 q(t) 与 V(t)，取最大值。",
+   "formula_note": "适用于坝前水面开阔、库尾回水影响小的水库；峡谷型水库动库容占比大时误差可达 10%~20%，应改用非恒定流数学模型（如 HEC-RAS、MIKE 11）。",
+   "variables": [
+    {
+     "key": "inflow_hydrograph",
+     "label": "入库流量过程",
+     "unit": "m³/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "q_v_relation",
+     "label": "泄量—库容关系 q(V)",
+     "unit": "",
+     "required": true,
+     "remark": "由 Z~V、Z~q 合成"
+    },
+    {
+     "key": "initial_volume",
+     "label": "起调库容",
+     "unit": "万m³",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "time_step",
+     "label": "时段长",
+     "unit": "h",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水利水电工程设计洪水计算规范》SL 44 附录；平湖法是手算与表格计算的传统方法，也可作为数学模型结果的合理性校核。",
+   "examples": [
+    {
+     "title": "S 值法推求",
+     "input": "Δt=1 h，V1=3000 万m³，q1=150 m³/s，(Q1+Q2)/2=900 m³/s，q~V 关系 q=0.05(V−2800)",
+     "output": "S1=3000×10⁴/3600+75=8417；S2=900+8417−150=9167 → V2/3600+q2/2=9167，联立 q2=0.05(V2−2800) 解得 q2≈222 m³/s、V2≈3452 万m³"
+    }
+   ]
+  },
+  {
+   "name": "基于DEM水位库容曲线提取",
+   "icon": "📐",
+   "category": "水文分析",
+   "description": "用 DEM 按等高线分层计算水面面积与库容，生成水位—面积—库容曲线，用于无实测地形图或需快速复核的水库。",
+   "formula": "1) 确定库区范围（坝址以上、回水末端以下），从 DEM 裁切；\n2) 按等高距 Δh（建议 0.5~2 m）分级，统计各级水位 Zi 以下的格网数 Ni，水面面积 Ai=Ni·a；\n3) 分层库容：ΔVi=(Ai+Ai+1)/2·Δh；\n4) 累计库容 V(Zi)=ΣΔVj；\n5) 输出 Z~A、Z~V 曲线，并校核：V 曲线应单调递增、无台阶，与实测断面法成果偏差宜≤5%。",
+   "formula_note": "DEM 必须为无植被/无建筑的真实地面模型（DSM 会把树高计入库容）；回水末端位置需按设计洪水位试算确定；库区有泥沙淤积时用淤积后地形。",
+   "variables": [
+    {
+     "key": "dem",
+     "label": "库区 DEM 数据",
+     "unit": "",
+     "required": true,
+     "remark": "格网≤10 m 精度更佳"
+    },
+    {
+     "key": "contour_interval",
+     "label": "分层等高距 Δh",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "normal_level",
+     "label": "正常蓄水位",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "dead_level",
+     "label": "死水位",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水利水电工程测量规范》SL 197；库容曲线是调洪演算、兴利调节与水库特征水位确定的基础成果，精度直接传递到防洪安全。",
+   "examples": [
+    {
+     "title": "两级分层库容",
+     "input": "Δh=1 m，A(100 m)=0.42 km²，A(101 m)=0.51 km²，A(102 m)=0.60 km²",
+     "output": "ΔV(100→101)=(0.42+0.51)/2×1×10⁶=46.5 万m³；ΔV(101→102)=55.5 万m³；V(102 m) 相对 100 m 增加 102 万m³"
+    }
+   ]
+  },
+  {
+   "name": "天文潮调和分析",
+   "icon": "🌙",
+   "category": "水文分析",
+   "description": "对实测潮位序列作调和分析，分离各分潮的振幅与迟角，用于潮位预报、设计高潮位与感潮河段边界条件。",
+   "formula": "1) 潮位表达式：h(t)=h0+Σ[fi·Hi·cos(σi·t+gi+(V0+u)i)]+r(t)；\n2) 取主要分潮：M2、S2、N2、K2、K1、O1、P1、Q1（必要时加 M4、MS4 浅水分潮）；\n3) 以最小二乘法求解各分潮 Hi、gi：由 n 个时刻观测值组成超定方程，法方程求解；\n4) 序列长度要求：不少于 369 天可分离全部主要分潮，短期（≥30 天）用差比关系补足；\n5) 预报：回代分潮参数计算任意时刻潮位，残差 rms 应≤10 cm。",
+   "formula_note": "分潮角速度 σ 取标准值（M2=28.9841042°/h）；调和常数随年份变化需用交点因子 f 与天文变量 (V0+u) 修正；缺测段应插补或剔除，避免污染最小二乘解。",
+   "variables": [
+    {
+     "key": "water_level_series",
+     "label": "逐时潮位序列",
+     "unit": "m",
+     "required": true,
+     "remark": "≥30 天，建议 1 年"
+    },
+    {
+     "key": "station_position",
+     "label": "验潮站经纬度",
+     "unit": "",
+     "required": true,
+     "remark": "用于计算天文变量"
+    },
+    {
+     "key": "constituents",
+     "label": "选用分潮列表",
+     "unit": "",
+     "required": false,
+     "remark": "缺省 8 个主要分潮"
+    }
+   ],
+   "knowledge": "《海港水文规范》JTS 145、《潮汐表》编制规范；调和常数是潮位预报、设计高潮位（重现期）与风暴潮增水分离的基础。",
+   "examples": [
+    {
+     "title": "M2 分潮预报",
+     "input": "H(M2)=1.82 m，g(M2)=245°，σ=28.9841°/h，t=3 h，V0+u=120°，f=1.00",
+     "output": "σt=86.95°，相位合计 86.95+245+120=451.95°→91.95°；h=1.82×cos(91.95°)=−0.062 m（叠加其他分潮与 h0 后为总潮位）"
+    }
+   ]
+  },
+  {
+   "name": "水库调洪演算图件制作",
+   "icon": "🖼️",
+   "category": "水文分析",
+   "description": "按成果表达要求绘制调洪演算图：入库与下泄流量过程线、库水位过程线、库容变化线及特征点标注，供报告与审查使用。",
+   "formula": "1) 图幅与比例：A3 横排，时间轴按洪水历时取 0~T，流量轴上限取 Qmax 的 1.1 倍；\n2) 主图：Q(t) 与 q(t) 同轴绘制，Q 用实线、q 用虚线，填充调蓄面积并标注 W调蓄；\n3) 副图：Z(t) 与 V(t) 上下对齐，共用时间轴；\n4) 特征点：起调水位、最大下泄 qmax、最高洪水位 Zmax 及其时刻，用竖虚线对齐并标注数值；\n5) 图例、单位、工况（P=1%、0.1%）齐全，同一工程多工况叠绘时用不同线型区分。",
+   "formula_note": "图中数值须与调洪演算表一致，不得手工改数；坐标轴刻度取整、等间距；审查要求可追溯计算过程，图应与表、文字说明三者闭合。",
+   "variables": [
+    {
+     "key": "inflow_series",
+     "label": "入库流量过程",
+     "unit": "m³/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "outflow_series",
+     "label": "下泄流量过程",
+     "unit": "m³/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "stage_series",
+     "label": "库水位过程",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "design_frequency",
+     "label": "工况频率",
+     "unit": "%",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水利水电工程制图标准》SL 73、《水利水电工程设计报告编制规程》；调洪图是防洪评价、水库调度方案与除险加固设计的必备附图。",
+   "examples": [
+    {
+     "title": "P=1% 工况出图",
+     "input": "Qmax=1820 m³/s（第 9 h），qmax=640 m³/s（第 14 h），Zmax=126.42 m，起调 122.00 m",
+     "output": "主图双线叠加、调蓄面积阴影；标注 14 h/640 m³/s、Zmax=126.42 m；副图 Z 轴范围 121~127 m"
+    }
+   ]
+  },
+  {
+   "name": "特征曲线图件制作",
+   "icon": "📊",
+   "category": "水文分析",
+   "description": "绘制水库水位—面积、水位—库容、水位—泄量等特征曲线族，统一坐标与比例，供调度运用与设计查用。",
+   "formula": "1) 三线同图：Z~A（km²）、Z~V（万m³）、Z~q（m³/s）共用纵轴水位；\n2) 横轴采用分段比例或对数比例，避免库容压缩面积曲线；\n3) 曲线应单调、光滑，节点处标注特征水位（死水位、正常蓄水位、设计/校核洪水位）；\n4) 泄量曲线注明泄流建筑物组合（溢洪道+泄洪洞）与闸门开度条件；\n5) 附数据表，曲线与表逐点对应。",
+   "formula_note": "特征曲线是调度图编制与调洪演算的查算依据，曲线不得外推至实测/计算范围以外；更新地形或改造泄流设施后必须重绘。",
+   "variables": [
+    {
+     "key": "stage_area",
+     "label": "水位—面积数据对",
+     "unit": "m, km²",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "stage_volume",
+     "label": "水位—库容数据对",
+     "unit": "m, 万m³",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "stage_discharge",
+     "label": "水位—泄量数据对",
+     "unit": "m, m³/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "characteristic_levels",
+     "label": "特征水位",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水利水电工程制图标准》SL 73、《水库大坝安全评价导则》SL 258；特征曲线是水库调度、防洪复核与大坝安全鉴定的基础图件。",
+   "examples": [
+    {
+     "title": "Z~V 曲线节点",
+     "input": "死水位 108.0 m（V=320 万m³）、正常蓄水位 122.0 m（V=2860 万m³）、校核洪水位 126.4 m（V=3980 万m³）",
+     "output": "曲线纵轴 105~128 m，横轴 0~4500 万m³，三个特征点加粗标注并引注库容值"
+    }
+   ]
+  },
+  {
+   "name": "流体实时模拟",
+   "icon": "💧",
+   "category": "水文分析",
+   "description": "对明渠、管道、库区流场作实时或准实时数值模拟，输出水位、流速、流量与流态，用于调度预演、应急分洪与方案比选。",
+   "formula": "1) 控制方程：一维 Saint-Venant 方程组（连续方程 ∂A/∂t+∂Q/∂x=0，动量方程 ∂Q/∂t+∂(Q²/A)/∂x+gA∂Z/∂x+gA|Q|Q/(K²)=0）；二维浅水方程用于库区/河口；\n2) 离散：有限体积法，Preissmann 四点隐格式或 HLLC 通量；\n3) 边界：上游给 Q(t)，下游给 Z(t) 或 Q~Z 关系；\n4) 稳定性：Courant 数 Cr=u·Δt/Δx≤1，取 Δt=0.5Δx/(|u|+√(gh))；\n5) 率定：用实测水位/流量过程调整糙率 n，Nash 效率系数应≥0.8；\n6) 实时运行：滚动同化实测水位，单步计算时延需小于调度决策周期。",
+   "formula_note": "实时模拟的精度取决于地形断面与糙率，洪水期糙率随淹没植被变化需动态调整；模型须先率定后预报，不得直接用于无验证条件的方案决策。",
+   "variables": [
+    {
+     "key": "channel_geometry",
+     "label": "河道断面/地形数据",
+     "unit": "",
+     "required": true,
+     "remark": "断面间距 100~500 m"
+    },
+    {
+     "key": "roughness",
+     "label": "糙率 n",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "upstream_boundary",
+     "label": "上游流量过程",
+     "unit": "m³/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "downstream_boundary",
+     "label": "下游水位过程",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "time_step",
+     "label": "时间步长",
+     "unit": "s",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《洪水风险图编制导则》《水库调度规程编制导则》SL 706；实时模拟常与水文预报耦合，形成预报—调度—模拟闭环。",
+   "examples": [
+    {
+     "title": "Courant 条件校核",
+     "input": "Δx=500 m，水深 h=4 m，流速 u=2.5 m/s",
+     "output": "c=√(9.81×4)=6.26 m/s；Δt≤0.5×500/(2.5+6.26)=28.5 s，取 Δt=20 s（Cr≈0.70）"
+    }
+   ]
+  },
+  {
+   "name": "水库供水能力计算",
+   "icon": "🚰",
+   "category": "水文分析",
+   "description": "在给定来水、库容与用水过程下，计算水库可提供的年（月）供水量与保证率，用于水资源论证与供水调度。",
+   "formula": "1) 年调节水量平衡：V2=V1+W来−W用−W损−W弃；\n2) 兴利库容约束：V死≤V≤V正常，缺水量 ΔW=W需−W可供；\n3) 长系列法：逐年来水 W来,i 与用水 W用,i 逐年演算，统计破坏年份，保证率 P=(n−m)/(n+1)（m 为破坏年数）；\n4) 供水能力 W供=max{W用 | P≥设计保证率}；\n5) 时历法成果用 P-Ⅲ 检验，工业生活保证率 95%~97%，灌溉 75%~85%。",
+   "formula_note": "必须计入蒸发、渗漏与上游用水；多水源联合供水时应做系统调节计算；成果需与水资源总量 red line（三条红线）复核。",
+   "variables": [
+    {
+     "key": "inflow_series",
+     "label": "长系列年（月）来水量",
+     "unit": "万m³",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "demand_series",
+     "label": "用水需求过程",
+     "unit": "万m³",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "active_storage",
+     "label": "兴利库容",
+     "unit": "万m³",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "dead_storage",
+     "label": "死库容",
+     "unit": "万m³",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "losses",
+     "label": "蒸发渗漏损失",
+     "unit": "万m³",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "design_guarantee",
+     "label": "设计保证率",
+     "unit": "%",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水利水电工程水文计算规范》SL 278、《水资源供需平衡分析技术导则》；供水能力是取水许可、水资源论证与水库功能调整的关键指标。",
+   "examples": [
+    {
+     "title": "年调节可供水量",
+     "input": "兴利库容 2860 万m³，多年平均来水 6200 万m³，损失 380 万m³，需水 5400 万m³",
+     "output": "可供水量=6200−380=5820 万m³＞5400，需进一步校核枯水年组：连续枯水年需动用兴利库容 2860 万m³ 补足缺口"
+    }
+   ]
+  },
+  {
+   "name": "潮位特征值计算",
+   "icon": "🌊",
+   "category": "水文分析",
+   "description": "统计验潮站潮位系列的特征值：最高/最低潮位、平均高潮位、平均潮差、涨落潮历时，并推求不同重现期的设计潮位。",
+   "formula": "1) 年特征值：年最高潮位、年最低潮位、年平均高潮位、年平均潮差；\n2) 潮差=高潮位−低潮位；平均潮差=(Σ潮差)/n；\n3) 涨（落）潮历时：由低潮到高潮（高潮到低潮）的时间间隔，按月统计平均；\n4) 设计潮位：对年最高潮位系列作 P-Ⅲ 或 Gumbel 频率分析，取设计频率对应值，并叠加风暴潮增水；\n5) 成果需与邻近站同步比对，差值应≤0.2 m。",
+   "formula_note": "年最高潮位系列应≥20 年；河口站需区分径流顶托影响；设计高潮位用于海堤顶高程、闸底板高程与排水口防潮。",
+   "variables": [
+    {
+     "key": "annual_max_levels",
+     "label": "年最高潮位系列",
+     "unit": "m",
+     "required": true,
+     "remark": "≥20 年，统一基准面"
+    },
+    {
+     "key": "annual_min_levels",
+     "label": "年最低潮位系列",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "tidal_ranges",
+     "label": "逐次潮差",
+     "unit": "m",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "design_frequency",
+     "label": "设计频率",
+     "unit": "%",
+     "required": true,
+     "remark": "海堤常用 1%、2%"
+    }
+   ],
+   "knowledge": "《海港水文规范》JTS 145、《海堤工程设计规范》SL 435；基准面须统一到 1985 国家高程基准，否则成果不可比。",
+   "examples": [
+    {
+     "title": "平均潮差",
+     "input": "某站 3 次潮差 2.42、3.10、2.86 m",
+     "output": "平均潮差=(2.42+3.10+2.86)/3=2.79 m"
+    }
+   ]
+  },
+  {
+   "name": "压力流管道计算",
+   "icon": "🚿",
+   "category": "水文分析",
+   "description": "按达西—魏斯巴赫或海曾—威廉公式计算有压管道沿程与局部水头损失、所需水头与输水流量，并校核经济流速与管径。",
+   "formula": "1) 流量—流速：v=Q/A，A=πD²/4；\n2) 沿程损失：hf=λ·(L/D)·v²/(2g)（达西式），λ 由 Re 与相对粗糙度按 Colebrook-White 或 Moody 图查取；\n3) 海曾—威廉（给水常用）：hf=10.67·L·Q^1.852/(C^1.852·D^4.87)；\n4) 局部损失：hj=Σζ·v²/(2g)；\n5) 所需水头：H=Δz+hf+hj+v²/(2g)；\n6) 经济管径：按经济流速 v=1.0~2.0 m/s（输水）反算 D=√(4Q/(πv))，取标准管径后复核。",
+   "formula_note": "钢管 λ 随 Re 变化，塑料管可用海曾—威廉 C=140~150；长距离管道需考虑水锤，验算关阀时间与管道压力等级。",
+   "variables": [
+    {
+     "key": "flow",
+     "label": "设计流量 Q",
+     "unit": "m³/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "diameter",
+     "label": "管道内径 D",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "length",
+     "label": "管道长度 L",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "roughness",
+     "label": "糙率/海曾系数 C",
+     "unit": "",
+     "required": true,
+     "remark": "钢管 λ 或 C=100~150"
+    },
+    {
+     "key": "local_loss_coeff",
+     "label": "局部损失系数之和 Σζ",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《室外给水设计标准》GB 50013、《泵站设计标准》GB 50265；压力管道水力计算是泵站扬程、管材压力等级与镇墩设计的输入。",
+   "examples": [
+    {
+     "title": "海曾—威廉法",
+     "input": "Q=0.35 m³/s，D=0.6 m，L=2000 m，C=130",
+     "output": "v=0.35/(π×0.36/4)=1.24 m/s；hf=10.67×2000×0.35^1.852/(130^1.852×0.6^4.87)≈6.9 m"
+    }
+   ]
+  },
+  {
+   "name": "单库供水能力计算",
+   "icon": "🏗️",
+   "category": "水文分析",
+   "description": "针对单一水库，按调节计算确定在不同来水与用水条件下的可供水量、供水保证率与弃水，输出供水能力成果表。",
+   "formula": "1) 逐月调节：V(i+1)=V(i)+W来(i)−W用(i)−W损(i)−W弃(i)；\n2) 约束：V死≤V≤V兴+V死；当 V 将低于 V死 时记破坏，ΔW缺=W用−(实际可供)；\n3) 弃水：V 超过正常蓄水位时 W弃=V(i+1)−V正常；\n4) 统计：破坏年数 m、保证率 P=(n−m)/(n+1)×100%；\n5) 试算不同 W用 水平，取满足设计保证率的最大值作为供水能力；\n6) 输出：年可供水量、月分配、保证率、弃水量。",
+   "formula_note": "与「水库供水能力计算」的区别：本卡面向单库全年逐月调节明细，前者面向多水源/长系列方案比选；蒸发按水面面积逐月计算。",
+   "variables": [
+    {
+     "key": "monthly_inflow",
+     "label": "逐月来水量",
+     "unit": "万m³",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "monthly_demand",
+     "label": "逐月需水量",
+     "unit": "万m³",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "storage_limits",
+     "label": "死库容与正常蓄水位对应库容",
+     "unit": "万m³",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "evaporation",
+     "label": "逐月水面蒸发",
+     "unit": "mm",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水利水电工程水文计算规范》SL 278、《水库调度规程编制导则》SL 706；供水能力成果须与取水许可水量、生态流量下泄要求同时满足。",
+   "examples": [
+    {
+     "title": "枯水月破坏判定",
+     "input": "月初 V=210 万m³，死库容 320 万m³，来水 40，需水 180，损失 15",
+     "output": "可供=210+40−15−320=−85＜0 → 该月破坏，缺水量约 85 万m³（需压减用水或动用死库容）"
+    }
+   ]
+  },
+  {
+   "name": "波浪计算",
+   "icon": "🌊",
+   "category": "工程设计",
+   "description": "由设计风速、风区长度与水深推求平均波高、平均波长与平均周期，是坝顶超高、护坡厚度、波浪爬高与堤防高程计算的前置成果。",
+   "formula": "1) 官厅水库公式（深水，gD/W²=20~250）：ghm/W²=0.0076(gD/W²)^(1/3)；gTm/W²=0.331(gD/W²)^(1/3.75)；\n2) 莆田试验站公式（SL 274 附录，适用浅水）：ghm/W²=0.13·th[0.7(gHm/W²)^0.7]·th{0.0018(gD/W²)^0.45/[0.13·th(0.7(gHm/W²)^0.7)]}；\n3) 平均波长：Lm=gTm²/(2π)·th(2πHm/Lm)，深水时 Lm=gTm²/(2π)；\n4) 累积频率换算：hm/hm(5%)=1.24、hm/hm(10%)=1.10、hm/hm(1%)=2.03（近似，查规范附表）；\n5) 输出设计波高（按建筑物等级取累积频率 1%、5% 或 10%）、波长、周期。",
+   "formula_note": "计算风速：正常运用取多年平均年最大风速的 1.5~2.0 倍，非常运用取 1.0 倍；风区长度按规范附录量取（取各方向有效吹程）；gD/W²<20 时公式不适用，需查规范图表。",
+   "variables": [
+    {
+     "key": "wind_speed",
+     "label": "计算风速 W",
+     "unit": "m/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "fetch",
+     "label": "风区长度（吹程）D",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "water_depth",
+     "label": "水域平均水深 Hm",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "cumulative_frequency",
+     "label": "设计波高累积频率",
+     "unit": "%",
+     "required": true,
+     "remark": "1/5/10"
+    }
+   ],
+   "knowledge": "《碾压式土石坝设计规范》SL 274 附录 A、《海港水文规范》JTS 145；波浪成果直接决定坝顶超高与护坡块石重量，风速取值偏小是常见安全隐患。",
+   "examples": [
+    {
+     "title": "官厅公式算波高",
+     "input": "W=22 m/s，D=1500 m，g=9.81",
+     "output": "gD/W²=9.81×1500/484=30.4；ghm/W²=0.0076×30.4^(1/3)=0.0237 → hm=0.0237×484/9.81=1.17 m"
+    }
+   ]
+  },
+  {
+   "name": "设计风速计算",
+   "icon": "💨",
+   "category": "工程设计",
+   "description": "由气象站实测风速换算至工程点设计高度（10 m）的设计风速，含高度换算、时距换算与重现期修正。",
+   "formula": "1) 高度换算（幂律）：v10=vz·(10/z)^α，α 取 0.12（海面/开阔）、0.16（田野）、0.20~0.30（城镇/林带）；\n2) 时距换算：10 min 平均为基本时距，瞬时风速≈1.3~1.5 倍 10 min 平均；\n3) 重现期修正：按极值Ⅰ型（Gumbel）分布，vT=v̄+K·σ，K 由重现期查表；\n4) 设计取值：正常运用 v设=1.5~2.0·v̄(年最大)，非常运用 v校=1.0·v̄；\n5) 山区需按地形修正系数 1.1~1.3 放大。",
+   "formula_note": "气象站与工程点海拔、地形差异大时应做差值修正；沿海工程须考虑台风影响，取台风过程最大风速；风速资料系列应≥20 年。",
+   "variables": [
+    {
+     "key": "measured_speed",
+     "label": "实测风速 vz",
+     "unit": "m/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "measure_height",
+     "label": "实测高度 z",
+     "unit": "m",
+     "required": true,
+     "remark": "气象站常为 10 m"
+    },
+    {
+     "key": "terrain_exponent",
+     "label": "地面粗糙度指数 α",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "return_period",
+     "label": "设计重现期",
+     "unit": "年",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《建筑结构荷载规范》GB 50009、《碾压式土石坝设计规范》SL 274；设计风速是波浪、风壅增水、脚手架与临时结构抗风的共同输入。",
+   "examples": [
+    {
+     "title": "高度换算",
+     "input": "z=10 m 实测 18.5 m/s，α=0.16，需换算至 2 m 高度（施工期）",
+     "output": "v2=18.5×(2/10)^0.16=18.5×0.774=14.3 m/s"
+    }
+   ]
+  },
+  {
+   "name": "高潮位GIS插值",
+   "icon": "🗺️",
+   "category": "工程设计",
+   "description": "由离散验潮站/潮位点的高潮位成果，在 GIS 中插值生成沿海设计高潮位面，为海堤、闸站、排水口提供设计潮位。",
+   "formula": "1) 数据准备：各站统一至 1985 国家高程基准，剔除异常点；\n2) 反距离权重（IDW）：Z(x)=Σ(zi/di^p)/Σ(1/di^p)，p 取 2；\n3) 或普通克里金：Z(x)=Σλi·zi，权重由变异函数 γ(h) 求解，需先拟合球状/指数模型；\n4) 交叉验证：留一法计算 RMSE，应≤0.15 m，否则调整 p 或变异函数；\n5) 输出栅格（建议 50~100 m）与等值线，工程点取值按双线性内插。",
+   "formula_note": "潮位受地形与径流顶托影响，河口段插值误差偏大，宜加设临时潮位站；插值面不得外推至无站控制的外海区域。",
+   "variables": [
+    {
+     "key": "station_points",
+     "label": "潮位站点坐标与高程",
+     "unit": "",
+     "required": true,
+     "remark": "≥5 站，含基准面"
+    },
+    {
+     "key": "interpolation_method",
+     "label": "插值方法",
+     "unit": "",
+     "required": true,
+     "remark": "IDW/克里金"
+    },
+    {
+     "key": "grid_size",
+     "label": "输出栅格尺寸",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "power",
+     "label": "IDW 幂指数 p",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《海堤工程设计规范》SL 435、《地理信息 空间插值》相关标准；设计高潮位是海堤顶高程、闸站防潮与排水系统规模的控制条件。",
+   "examples": [
+    {
+     "title": "IDW 单点插值",
+     "input": "两站 z1=4.12 m（d1=800 m）、z2=3.86 m（d2=1600 m），p=2",
+     "output": "w1=(1/640000)/(1/640000+1/2560000)=0.80，w2=0.20 → Z=4.12×0.80+3.86×0.20=4.07 m"
+    }
+   ]
+  },
+  {
+   "name": "管道埋深计算",
+   "icon": "🕳️",
+   "category": "工程设计",
+   "description": "确定压力管道/排水管的最小覆土厚度与埋设高程，满足冻胀、外荷载、冲刷与施工要求。",
+   "formula": "1) 管顶埋深 H=管底高程差+管径 D，即 H=z地面−z管顶；\n2) 冻胀控制：H≥冻深 hf+0.3 m（不冻胀土可取 0.5D 且≥0.6 m）；\n3) 车荷载控制：公路下 H≥0.7 m（D≤0.6 m 时≥1.0 m），并按《给水排水工程管道结构设计规范》验算轮压；\n4) 冲刷控制：穿河段管顶应低于一般冲刷线以下 0.5~1.0 m；\n5) 综合取最大值，并校核施工开挖与地下水。",
+   "formula_note": "冻深按当地气象资料取 50 年一遇最大冻深；软土地基需另计沉降后埋深；管道交叉时应保持净距≥0.15 m（给水与排水）。",
+   "variables": [
+    {
+     "key": "ground_elevation",
+     "label": "地面高程",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "pipe_diameter",
+     "label": "管道外径 D",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "frost_depth",
+     "label": "最大冻深",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "traffic_load",
+     "label": "是否有车荷载",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "scour_depth",
+     "label": "一般冲刷深度",
+     "unit": "m",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《室外给水设计标准》GB 50013、《给水排水工程管道结构设计规范》GB 50332；埋深不足是北方管道冬季冻裂与重车压坏的主要原因。",
+   "examples": [
+    {
+     "title": "冻深控制埋深",
+     "input": "冻深 1.4 m，D=0.4 m，非机动车道",
+     "output": "H≥1.4+0.3=1.7 m（管顶埋深），管底高程=地面−1.7−0.4=地面−2.1 m"
+    }
+   ]
+  },
+  {
+   "name": "常用断面水力特征值计算",
+   "icon": "📏",
+   "category": "工程设计",
+   "description": "计算矩形、梯形、三角形、圆形、复式断面的过水面积、湿周、水力半径、流量模数与弗劳德数，是明渠与管道水力设计的基础。",
+   "formula": "1) 梯形断面：A=(b+mh)h，χ=b+2h√(1+m²)，R=A/χ；\n2) 矩形：A=bh，χ=b+2h；三角形：A=mh²，χ=2h√(1+m²)；\n3) 圆形（满流）：A=πD²/4，χ=πD，R=D/4；非满流按充满度查表；\n4) 流量：Q=(1/n)·A·R^(2/3)·i^(1/2)（曼宁）；v=Q/A；\n5) 弗劳德数：Fr=v/√(g·A/B)，B 为水面宽；Fr<1 缓流、Fr=1 临界、Fr>1 急流；\n6) 临界水深：Fr=1 时反解 hk（矩形 hk=(q²/g)^(1/3)）。",
+   "formula_note": "曼宁 n：混凝土 0.014、浆砌石 0.017、土渠 0.025、天然河道 0.030~0.040；复式断面应分主槽与滩地分别计算再叠加。",
+   "variables": [
+    {
+     "key": "section_type",
+     "label": "断面型式",
+     "unit": "",
+     "required": true,
+     "remark": "梯形/矩形/三角形/圆形"
+    },
+    {
+     "key": "bottom_width",
+     "label": "底宽 b",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "side_slope",
+     "label": "边坡系数 m",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "water_depth",
+     "label": "水深 h",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "roughness",
+     "label": "糙率 n",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "bed_slope",
+     "label": "底坡 i",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水力学计算手册》、《灌溉与排水工程设计标准》GB 50288；断面特征值是水面线推算、消能计算与渠道设计的共用基础。",
+   "examples": [
+    {
+     "title": "梯形渠道流量",
+     "input": "b=3 m，m=1.5，h=1.2 m，n=0.017，i=0.0005",
+     "output": "A=(3+1.8)×1.2=5.76 m²；χ=3+2×1.2×1.803=7.33 m；R=0.786 m；Q=(1/0.017)×5.76×0.786^(2/3)×0.0224=9.0 m³/s"
+    }
+   ]
+  },
+  {
+   "name": "一维渗流计算",
+   "icon": "🪨",
+   "category": "工程设计",
+   "description": "按达西定律计算均质地基/土坝的单宽渗流量、渗透坡降与浸润线，用于渗流稳定与排水设计。",
+   "formula": "1) 达西定律：v=k·i，i=ΔH/L，单宽流量 q=k·i·A（A 取单位宽×含水层厚）；\n2) 均质土坝（不透水地基）单宽渗流：q=k(H1²−H2²)/(2L)，L 为上下游水面与坝坡交点间水平距离；\n3) 浸润线（杜平假定）：y²=H1²−(H1²−H2²)x/L；\n4) 出口坡降：J出=ΔH/(T·Σξ)（改进阻力系数法）或按流网量测；\n5) 抗渗稳定：J出≤[J]，[J] 按土类取 0.3~0.5（管涌）或 0.5~0.8（流土）。",
+   "formula_note": "达西定律适用 Re<10 的层流；砾石、堆石体需用非线性（Forchheimer）公式；各向异性地基应折算等效渗透系数 k=√(kx·ky)。",
+   "variables": [
+    {
+     "key": "permeability",
+     "label": "渗透系数 k",
+     "unit": "m/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "upstream_head",
+     "label": "上游水深 H1",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "downstream_head",
+     "label": "下游水深 H2",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "seepage_length",
+     "label": "渗流长度 L",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "layer_thickness",
+     "label": "透水层厚度 T",
+     "unit": "m",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《碾压式土石坝设计规范》SL 274、《水工建筑物抗震设计标准》GB 51247；渗流计算是防渗体尺寸、反滤层与排水体设计的依据。",
+   "examples": [
+    {
+     "title": "均质坝单宽渗流",
+     "input": "k=1.0×10⁻⁵ m/s，H1=12 m，H2=2 m，L=60 m",
+     "output": "q=1.0×10⁻⁵×(144−4)/(2×60)=1.17×10⁻⁵ m³/(s·m)=1.01 m³/(d·m)"
+    }
+   ]
+  },
+  {
+   "name": "堰面曲线计算",
+   "icon": "📐",
+   "category": "工程设计",
+   "description": "按 WES 标准堰型计算溢流堰下游幂曲线与上游堰头圆弧，输出坐标表供模板放样与模型制作。",
+   "formula": "1) 定型设计水头 Hd：高堰（P1≥1.33Hd）取 (0.75~0.95)Hmax，低堰取 (0.65~0.85)Hmax；\n2) 下游幂曲线：x^n=K·Hd^(n−1)·y，上游面铅直时 K=2.000、n=1.850；3:1 边坡 K=1.936、n=1.836；\n3) 上游堰头双圆弧：R1=0.5Hd、R2=0.2Hd（铅直面），圆心按规范表 A.1.1 定位；\n4) 切点：幂曲线与下游直线段（坡度 1:0.7~1:0.8）相切处，令 dy/dx=1/m 求 x切；\n5) 输出 x=0~x切 的 (x,y) 坐标表，间隔 0.5~1.0 m。",
+   "formula_note": "堰面曲线坐标原点在堰顶最高点，x 向下游、y 向下为正；负压控制：Hmax 时堰面负压不应超过规范表 A.1.1-1 限值（一般 −3~−6 m 水柱）。",
+   "variables": [
+    {
+     "key": "max_head",
+     "label": "堰顶最大作用水头 Hmax",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "weir_height",
+     "label": "上游堰高 P1",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "upstream_slope",
+     "label": "上游面坡度",
+     "unit": "",
+     "required": true,
+     "remark": "铅直/3:1"
+    },
+    {
+     "key": "downstream_slope",
+     "label": "下游直线段坡度",
+     "unit": "",
+     "required": true,
+     "remark": "如 1:0.75"
+    }
+   ],
+   "knowledge": "《溢洪道设计规范》SL 253 附录 A.1；WES 曲线是国内外通用标准堰型，坐标精度直接影响泄流能力与堰面负压。",
+   "examples": [
+    {
+     "title": "铅直面 WES 曲线取点",
+     "input": "Hmax=6.0 m，P1=8 m（高堰），取 Hd=0.85×6.0=5.1 m",
+     "output": "y=x^1.85/(2.0×5.1^0.85)=x^1.85/7.85；x=4 m 时 y=4^1.85/7.85=13.02/7.85=1.66 m"
+    }
+   ]
+  },
+  {
+   "name": "泄流能力计算",
+   "icon": "🚪",
+   "category": "工程设计",
+   "description": "计算开敞式 WES 实用堰、宽顶堰、闸孔出流的泄流量，确定溢洪道宽度、闸孔尺寸与水位—泄量关系曲线。",
+   "formula": "1) 开敞式实用堰：Q=c·m·ε·σs·n·b·√(2g)·H0^(3/2)；\n2) 侧收缩系数：ε=1−0.2[ζk+(n−1)ζ0]·H0/(n·b)；\n3) 宽顶堰：Q=m·ε·B·√(2g)·H0^(3/2)，m=0.385（进口平顺）；\n4) 闸孔出流（e/H≤0.75）：Q=μ·b·e·√(2g·H0)，μ=0.60~0.62；\n5) 判别：e/H>0.75 按堰流，否则按孔流；\n6) H0=H+v0²/(2g)，行近流速水头不可忽略时迭代。",
+   "formula_note": "流量系数 m 随堰型与 H0/Hd 变化，H0/Hd>1 时应按规范附表折减；淹没系数 σs 按下游水位查表，淹没出流会显著降低泄量。",
+   "variables": [
+    {
+     "key": "weir_type",
+     "label": "堰型",
+     "unit": "",
+     "required": true,
+     "remark": "WES/宽顶堰/闸孔"
+    },
+    {
+     "key": "net_width",
+     "label": "净宽 B 或 n·b",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "head",
+     "label": "堰上水头 H",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "discharge_coeff",
+     "label": "流量系数 m 或 μ",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "side_contraction",
+     "label": "侧收缩系数 ε",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "submergence",
+     "label": "淹没系数 σs",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《溢洪道设计规范》SL 253、《水闸设计规范》SL 265；泄流曲线是调洪演算的输入，也是溢洪道规模论证的核心。",
+   "examples": [
+    {
+     "title": "三孔 WES 堰泄量",
+     "input": "n=3，b=12 m，H0=5.6 m，m=0.494，ε=0.96，σs=1.0，c=1.0",
+     "output": "Q=1.0×0.494×0.96×1.0×3×12×4.429×5.6^1.5=0.494×0.96×36×4.429×13.25≈836 m³/s"
+    }
+   ]
+  },
+  {
+   "name": "过流能力计算",
+   "icon": "🌊",
+   "category": "工程设计",
+   "description": "计算涵洞、隧洞、明渠等过水建筑物的过流能力，判别有压/无压流态并给出水位—流量关系。",
+   "formula": "1) 明渠均匀流：Q=(1/n)·A·R^(2/3)·i^(1/2)；\n2) 无压涵洞（短洞）：Q=σ·ε·m·b·√(2g)·H0^(3/2)，按进口型式取 m=0.32~0.36；\n3) 有压隧洞/涵洞：Q=μ·A·√(2g·H0)，μ=1/√(1+Σζ+λL/D)；\n4) 流态判别：H/D<1.2 无压、1.2~1.5 半有压、>1.5 有压；\n5) 出口淹没时按淹没出流修正 σs；\n6) 输出 H~Q 曲线并标注设计/校核流量对应水位。",
+   "formula_note": "长洞需计入沿程损失，短洞（L<10H）可只计进口损失；隧洞糙率取 0.014（混凝土衬砌）；有压洞需验算出口流速与消能。",
+   "variables": [
+    {
+     "key": "section_area",
+     "label": "过水断面面积 A",
+     "unit": "m²",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "hydraulic_radius",
+     "label": "水力半径 R",
+     "unit": "m",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "roughness",
+     "label": "糙率 n",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "head",
+     "label": "作用水头 H0",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "length",
+     "label": "洞长 L",
+     "unit": "m",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水工隧洞设计规范》SL 279、《灌溉与排水工程设计标准》GB 50288；过流能力决定泄洪洞尺寸与导流方案。",
+   "examples": [
+    {
+     "title": "有压隧洞泄量",
+     "input": "A=12.6 m²（D=4 m），H0=18 m，μ=0.62",
+     "output": "Q=0.62×12.6×√(2×9.81×18)=0.62×12.6×18.79=146.8 m³/s"
+    }
+   ]
+  },
+  {
+   "name": "槽身过流能力计算",
+   "icon": "🌉",
+   "category": "工程设计",
+   "description": "计算渡槽槽身（矩形、U 形、箱形）的过流能力与水深，校核设计流量下的超高与不冲不淤流速。",
+   "formula": "1) 明流：Q=(1/n)·A·R^(2/3)·i^(1/2)，i 取槽底纵坡（1/500~1/1500）；\n2) 矩形槽：A=bh，χ=b+2h，R=bh/(b+2h)；U 形槽按规范几何式；\n3) 设计水深 h 应满足：h+超高（0.2~0.4 m）≤槽深 H；\n4) 流速控制：v=1.0~2.5 m/s（混凝土槽），v<0.6 m/s 易淤积；\n5) 加大流量校核：Q加大=1.2~1.3Q设计，超高不小于 0.1 m。",
+   "formula_note": "渡槽糙率取 0.013~0.014（预制混凝土）；弯道、进出口渐变段需另计局部损失；U 形槽水力条件优于矩形槽。",
+   "variables": [
+    {
+     "key": "design_flow",
+     "label": "设计流量 Q",
+     "unit": "m³/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "channel_width",
+     "label": "槽宽 b",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "bed_slope",
+     "label": "槽底纵坡 i",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "roughness",
+     "label": "糙率 n",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "flume_depth",
+     "label": "槽深 H",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《灌溉与排水工程设计标准》GB 50288、《渡槽设计规范》；槽身过流能力不足会导致上游壅水淹渠，过大则造价浪费。",
+   "examples": [
+    {
+     "title": "矩形渡槽水深",
+     "input": "Q=8 m³/s，b=3 m，i=1/800，n=0.014",
+     "output": "试算 h=1.35 m：A=4.05，R=0.71，Q=(1/0.014)×4.05×0.71^(2/3)×0.0354=8.05 m³/s ✓，取 h=1.35 m，槽深取 1.75 m"
+    }
+   ]
+  },
+  {
+   "name": "渡槽总水头计算",
+   "icon": "📉",
+   "category": "工程设计",
+   "description": "计算渡槽进出口渐变段、槽身沿程与弯道等局部损失之和，得到渡槽总水头损失，用于渠系水面线衔接。",
+   "formula": "1) 进口渐变段：hj1=ζ1·(v1²−v2²)/(2g)，ζ1=0.10~0.20；\n2) 槽身沿程：hf=i·L（i 为槽底坡，L 为槽长）；\n3) 出口渐变段：hj2=ζ2·(v2²−v3²)/(2g)，ζ2=0.20~0.30；\n4) 弯道：hj3=ζ3·v²/(2g)，ζ3=0.05~0.10；\n5) 总水头 ΔH=hf+Σhj；\n6) 槽内水面高程=进口渠水位−Σ损失，应高于下游渠水位。",
+   "formula_note": "渐变段长度取 (3~5)(b2−b1)；流速差小时损失可忽略；总水头损失一般控制在 0.1~0.3 m，过大会影响自流灌溉面积。",
+   "variables": [
+    {
+     "key": "upstream_velocity",
+     "label": "进口渠道流速 v1",
+     "unit": "m/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "flume_velocity",
+     "label": "槽内流速 v2",
+     "unit": "m/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "downstream_velocity",
+     "label": "出口渠道流速 v3",
+     "unit": "m/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "flume_length",
+     "label": "槽长 L",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "bed_slope",
+     "label": "槽底坡 i",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《渡槽设计规范》、《水力学计算手册》；渡槽水头损失直接决定渠系控制高程与灌溉面积。",
+   "examples": [
+    {
+     "title": "总损失",
+     "input": "v1=0.9、v2=1.6、v3=0.8 m/s，ζ1=0.15、ζ2=0.25，L=120 m，i=1/800",
+     "output": "hj1=0.15×(0.81−2.56)/19.62=−0.013 m（加速，取 0）；hj2=0.25×(2.56−0.64)/19.62=0.024 m；hf=0.15 m；ΔH≈0.17 m"
+    }
+   ]
+  },
+  {
+   "name": "水面衔接计算",
+   "icon": "🔗",
+   "category": "工程设计",
+   "description": "判别泄水建筑物下游水流的衔接形式（淹没式/非淹没式水跃），计算共轭水深与所需消能措施。",
+   "formula": "1) 收缩断面水深 h1：由能量方程 E0=h1+q²/(2gφ²h1²) 试算；\n2) 共轭水深：h2=(h1/2)·[√(1+8Fr1²)−1]，Fr1=v1/√(g·h1)；\n3) 判别：下游水深 ht>h2 为淹没式衔接（无需消力池），ht=h2 临界，ht<h2 为远驱式水跃（需消能）；\n4) 消力池深：d=σ·h2−ht−Δz，σ=1.05~1.10；\n5) 消力池长：Lk=(0.7~0.8)Lj，Lj=6.9(h2−h1)。",
+   "formula_note": "φ 取 0.80~0.95（混凝土泄槽）；计算应取设计、校核及消能防冲设计洪水三种工况的最不利者。",
+   "variables": [
+    {
+     "key": "unit_discharge",
+     "label": "单宽流量 q",
+     "unit": "m³/(s·m)",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "total_head",
+     "label": "上游总水头 E0",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "downstream_depth",
+     "label": "下游水深 ht",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "velocity_coeff",
+     "label": "流速系数 φ",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水工建筑物》教材与《溢洪道设计规范》SL 253；衔接形式判别是消力池是否设置与尺寸确定的直接依据。",
+   "examples": [
+    {
+     "title": "共轭水深",
+     "input": "h1=0.9 m，v1=12 m/s",
+     "output": "Fr1=12/√(9.81×0.9)=4.04；h2=0.45×(√(1+8×16.3)−1)=0.45×(11.51−1)=4.73 m；若 ht=3.2 m<4.73 m，需设消力池"
+    }
+   ]
+  },
+  {
+   "name": "水头损失计算",
+   "icon": "📉",
+   "category": "工程设计",
+   "description": "汇总管道、渠道、隧洞的沿程与局部水头损失，为泵站扬程、水面线推算与能量方程提供依据。",
+   "formula": "1) 沿程：hf=λ(L/D)v²/(2g) 或 hf=(1/n²)(L)·v²/R^(4/3)（曼宁式）；\n2) 局部：hj=ζ·v²/(2g)；\n3) 常见 ζ：进口 0.5、出口 1.0、闸阀全开 0.1~0.2、90°弯头 0.9、突然扩大 (1−A1/A2)²；\n4) 总损失：hw=hf+Σhj；\n5) 泵站总扬程：H=H净+hw+v²/(2g)。",
+   "formula_note": "长管（L/D>1000）可忽略局部损失；短管必须计入；淤积、结垢会使 λ 增大 20%~50%，设计应留裕度。",
+   "variables": [
+    {
+     "key": "flow",
+     "label": "流量 Q",
+     "unit": "m³/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "diameter",
+     "label": "管径/水力直径 D",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "length",
+     "label": "长度 L",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "roughness",
+     "label": "糙率 n 或 λ",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "local_coeff_sum",
+     "label": "局部系数之和 Σζ",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《泵站设计标准》GB 50265、《水力学计算手册》；水头损失直接影响装机容量与运行电费。",
+   "examples": [
+    {
+     "title": "长管沿程损失",
+     "input": "v=1.5 m/s，L=1200 m，D=0.8 m，λ=0.021",
+     "output": "hf=0.021×(1200/0.8)×(2.25/19.62)=0.021×1500×0.1147=3.61 m"
+    }
+   ]
+  },
+  {
+   "name": "压坡线计算",
+   "icon": "📈",
+   "category": "工程设计",
+   "description": "绘制管道/隧洞的测压管水头线（压坡线），检查沿线是否出现负压与超出管材压力，确定镇墩与排气阀位置。",
+   "formula": "1) 总水头线：H(x)=H0−Σhf−Σhj；\n2) 压坡线（测压管水头）：Hp(x)=H(x)−v(x)²/(2g)；\n3) 管道内压：p/γ=Hp−z；负值即为负压；\n4) 控制条件：p/γ≥−2 m（钢管）且≤管材允许压力（含 1.3~1.5 倍水锤升值）；\n5) 逐节点绘制，突变处（阀门、变径）竖直跌落 ζv²/2g。",
+   "formula_note": "驼峰、凸起段最易出现负压，应设排气阀或降低管线；水锤计算（特征线法）用于校核关阀工况的最大升压。",
+   "variables": [
+    {
+     "key": "total_head",
+     "label": "起始总水头 H0",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "node_elevations",
+     "label": "各节点高程 z",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "head_losses",
+     "label": "各段损失",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "velocity",
+     "label": "管内流速 v",
+     "unit": "m/s",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水电站压力钢管设计规范》NB/T 35056、《泵站设计标准》GB 50265；压坡线是管道纵剖面设计、镇墩布置与负压控制的图解法。",
+   "examples": [
+    {
+     "title": "节点压力",
+     "input": "H0=120 m，累计损失 8 m，v=2.0 m/s，节点高程 118 m",
+     "output": "H=112 m；Hp=112−4/19.62=111.8 m；p/γ=111.8−118=−6.2 m → 负压超限，需调整纵剖面"
+    }
+   ]
+  },
+  {
+   "name": "水面线计算",
+   "icon": "📉",
+   "category": "工程设计",
+   "description": "按能量方程分段推算天然河道或渠道的水面线，确定各断面水位、壅水高度与回水范围。",
+   "formula": "1) 能量方程：z1+h1+α1v1²/2g=z2+h2+α2v2²/2g+hf+hj；\n2) 分段法：Δs=[(h2+α2v2²/2g)−(h1+α1v1²/2g)]/(i−J̄)，J̄=(J1+J2)/2，J=v²n²/R^(4/3)；\n3) 缓流从下游向上游推算（已知下游水位），急流从上游向下游推算；\n4) 断面间距 100~500 m，河道弯曲、断面突变处加密；\n5) 成果：各断面设计洪水位、壅水曲线、回水末端位置。",
+   "formula_note": "天然河道应分主槽与滩地取不同糙率；急流段（Fr>1）不能自下游推上游；回水计算需取设计洪水与校核洪水两种工况。",
+   "variables": [
+    {
+     "key": "downstream_level",
+     "label": "起始断面水位",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "cross_sections",
+     "label": "各断面几何与糙率",
+     "unit": "",
+     "required": true,
+     "remark": "间距、底高程、A、R"
+    },
+    {
+     "key": "design_flow",
+     "label": "设计流量",
+     "unit": "m³/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "roughness",
+     "label": "分区分段糙率",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水利水电工程设计洪水计算规范》SL 44、《防洪评价报告编制导则》；水面线是堤防高程、桥梁净空与回水淹没范围的依据。",
+   "examples": [
+    {
+     "title": "一段壅水",
+     "input": "下游 h2=5.0 m、v2=1.2 m/s；上游 h1=4.6 m、v1=1.5 m/s；i=0.0008，J̄=0.0006",
+     "output": "Δs=[(5.0+0.073)−(4.6+0.115)]/(0.0008−0.0006)=0.358/0.0002=1790 m（该段水位差 0.4 m）"
+    }
+   ]
+  },
+  {
+   "name": "泄槽（溢洪道）水面线计算",
+   "icon": "🌊",
+   "category": "工程设计",
+   "description": "推算陡坡泄槽内的急流水面线，确定边墙高度、掺气水深与下游消能衔接条件。",
+   "formula": "1) 起始水深：泄槽进口（控制断面）取临界水深 hk=(q²/g)^(1/3) 或堰后收缩断面；\n2) 分段能量方程（自上游向下游）：Δs=[(h2+αv2²/2g)−(h1+αv1²/2g)]/(i−J̄)；\n3) 掺气水深：ha=h(1+ζv/100)，ζ=1.0~1.4（v>20 m/s 时）；\n4) 边墙高：H=ha+安全超高（0.5~1.0 m）；\n5) 成果：沿程水深、流速、Fr 与掺气水深表。",
+   "formula_note": "陡坡 i>ik 为急流，水面线自上游向下游推；弯道冲击波会使边墙水位局部升高，需加高 10%~20%；掺气水深用于确定边墙高而非水力计算。",
+   "variables": [
+    {
+     "key": "unit_discharge",
+     "label": "单宽流量 q",
+     "unit": "m³/(s·m)",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "bed_slope",
+     "label": "泄槽底坡 i",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "roughness",
+     "label": "糙率 n",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "width",
+     "label": "泄槽净宽 b",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "length",
+     "label": "泄槽长度",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《溢洪道设计规范》SL 253；泄槽水面线决定边墙高度与掺气坎设置，边墙不足会造成漫溢冲刷。",
+   "examples": [
+    {
+     "title": "临界水深与掺气",
+     "input": "q=25 m³/(s·m)，v=18 m/s，h=1.39 m",
+     "output": "hk=(625/9.81)^(1/3)=3.99 m（陡坡段 h 可小于 hk，急流）；掺气水深 ha=1.39×(1+1.2×18/100)=1.69 m，边墙高取 2.4 m"
+    }
+   ]
+  },
+  {
+   "name": "高速水流防空蚀计算",
+   "icon": "💥",
+   "category": "工程设计",
+   "description": "评估泄水建筑物高速水流区的空化空蚀风险，确定掺气减蚀设施与表面不平整度控制标准。",
+   "formula": "1) 空化数：σ=(p0−pv)/(0.5ρv²)，p0 为参考点压力，pv 为汽化压力（20 ℃ 约 0.24 m 水柱）；\n2) 初生空化判别：σ<σi（初生空化数，由体形试验确定）时有空化风险；\n3) 抗蚀指数：I=v·√(h/(g))；v>30 m/s 的过流面必须设掺气设施；\n4) 掺气浓度：C≥3%（一般）、C≥5%（重要部位），掺气坎后保护长度 L≈(10~15)h；\n5) 不平整度控制：垂直凸起 Δ≤(0.02~0.05)h，错台坡度 ≤1:20~1:50。",
+   "formula_note": "空蚀多发生在门槽、止水、施工缝、凹凸错台处；掺气减蚀是目前最有效手段；σ 计算的压力应取模型试验或数值模拟结果，不可用平均压强代替。",
+   "variables": [
+    {
+     "key": "flow_velocity",
+     "label": "过流流速 v",
+     "unit": "m/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "pressure_head",
+     "label": "参考点压力水头 p0/γ",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "vapor_pressure",
+     "label": "汽化压力水头",
+     "unit": "m",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "surface_irregularity",
+     "label": "表面不平整度 Δ",
+     "unit": "mm",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水工建筑物抗冲磨防空蚀设计规范》DL/T 5207；高坝泄洪建筑物空蚀破坏案例多源于不平整度超标。",
+   "examples": [
+    {
+     "title": "空化数",
+     "input": "v=35 m/s，p0/γ=8 m，pv/γ=0.24 m",
+     "output": "σ=(8−0.24)/(0.5×35²/9.81)=7.76/62.4=0.124 → 空化数很低，须设掺气坎并严控不平整度"
+    }
+   ]
+  },
+  {
+   "name": "龙口水力计算",
+   "icon": "🚧",
+   "category": "工程设计",
+   "description": "计算截流龙口的水力要素：龙口流量、上下游水位差、流速与抛投体稳定重量，用于截流方案与备料设计。",
+   "formula": "1) 龙口流量（宽顶堰型）：Q=ε·m·B·√(2g)·H0^(3/2)，m=0.33~0.385；\n2) 分流：Q龙=Q来−Q导流（隧洞/明渠分流按各自泄流曲线）；\n3) 水位差：由 Q龙 反算上游壅高 Z上，ΔZ=Z上−Z下；\n4) 龙口流速：v=Q龙/(ε·B·h)，h 为龙口平均水深；\n5) 抛投体稳定：G=γs·d³，d=v²/(2g·(γs/γ−1)·ψ)，或用伊兹巴什公式反算块石粒径；\n6) 输出 B~Q~v~ΔZ 关系，确定截流时刻与抛投强度。",
+   "formula_note": "截流应按设计流量（一般 10~20 年一遇月平均流量）计算；龙口收缩过程中 m 随 B/H 变化，需分段计算；立堵进占的抛投强度应≥计算值的 1.2 倍。",
+   "variables": [
+    {
+     "key": "inflow",
+     "label": "截流设计流量 Q来",
+     "unit": "m³/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "closure_width",
+     "label": "龙口宽度 B",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "upstream_level",
+     "label": "上游水位",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "downstream_level",
+     "label": "下游水位",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "diversion_capacity",
+     "label": "导流建筑物分流能力",
+     "unit": "m³/s",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水利水电工程施工组织设计规范》SL 303、《截流施工技术规范》；龙口水力指标决定截流难度、备料量与设备配置。",
+   "examples": [
+    {
+     "title": "龙口流量与流速",
+     "input": "Q来=320 m³/s，导流洞分 180 m³/s，B=25 m，h=3.2 m，ε=0.95",
+     "output": "Q龙=140 m³/s；v=140/(0.95×25×3.2)=1.84 m/s；按伊兹巴什 d=v²/(2g×1.65×0.86)=3.39/27.8=0.12 m → 块石粒径≥0.12 m"
+    }
+   ]
+  },
+  {
+   "name": "波浪作用力计算",
+   "icon": "💨",
+   "category": "工程设计",
+   "description": "计算波浪对直立堤、斜坡堤、闸墩及护面的波浪压力与浮托力，用于结构抗滑抗倾与护面块体稳定验算。",
+   "formula": "1) 直立堤立波压力（简化）：p1=γw·H（波峰线处），p2=γw(H−d1)，合力 P=(p1+p2)/2·d1，作用点距基面 d1/3；\n2) 破碎波冲击：P=1.5γw·H²/2（破波区）；\n3) 斜坡堤护面块体：G=0.1γs·H³/[Δ³·cotα·(Sr−1)³]（Hudson 公式），Δ 为坡度影响系数；\n4) 浮托力：U=γw·H·B/2（护面板下）；\n5) 稳定验算：Kc=f·ΣG/ΣP≥1.05~1.10，抗倾 K0=ΣMR/ΣM0≥1.3~1.5。",
+   "formula_note": "H 取设计波高（累积频率 1% 或 13%）；Hudson 公式适用斜坡堤抛石/块体护面，需按容许失稳率选取 KD；波浪压力分布应查《海港水文规范》附录。",
+   "variables": [
+    {
+     "key": "wave_height",
+     "label": "设计波高 H",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "water_depth",
+     "label": "堤前水深 d",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "structure_type",
+     "label": "结构型式",
+     "unit": "",
+     "required": true,
+     "remark": "直立堤/斜坡堤"
+    },
+    {
+     "key": "slope_ratio",
+     "label": "斜坡坡比 cotα",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "block_density",
+     "label": "块体密度",
+     "unit": "t/m³",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《海港水文规范》JTS 145、《海堤工程设计规范》SL 435；波浪力是海堤、防波堤断面尺寸与护面块体重量的控制荷载。",
+   "examples": [
+    {
+     "title": "直立堤立波压力",
+     "input": "H=2.0 m，d=6.0 m，γw=9.81 kN/m³",
+     "output": "p1=19.6 kPa，波谷处 p2≈9.81×(2−1.5)=4.9 kPa；合力 P=(19.6+4.9)/2×1.5≈18.4 kN/m"
+    }
+   ]
+  },
+  {
+   "name": "挑流消能及底流消能挑距及冲刷深度计算",
+   "icon": "💦",
+   "category": "工程设计",
+   "description": "计算挑流水舌挑距与下游冲刷坑深度，或底流消力池的池深池长与出池流速，用于消能工布置与下游防护设计。",
+   "formula": "1) 挑距：L=[v1²sinθcosθ+v1cosθ√(v1²sin²θ+2g(h1cosθ+h2))]/g，v1 取鼻坎平均流速的 1.1 倍，θ=15°~35°；\n2) 冲坑深度：T=k·q^0.5·Z^0.25−hs，k=1.1~1.5（岩基取小值），Z 为上下游水位差，hs 为下游水深；\n3) 冲坑后坡：i=T/L，要求 i≤1/3~1/4（岩基）；\n4) 底流消能：池深 d=σh2−ht，池长 Lk=(0.7~0.8)×6.9(h2−h1)；\n5) 出池流速 v=Q/(B·h出)≤下游允许流速。",
+   "formula_note": "挑流适用于岩基较好的情况；冲坑深度应取设计洪水与消能防冲设计洪水的最不利值；护坦末端需设齿墙防淘刷。",
+   "variables": [
+    {
+     "key": "unit_discharge",
+     "label": "单宽流量 q",
+     "unit": "m³/(s·m)",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "jet_velocity",
+     "label": "鼻坎流速 v1",
+     "unit": "m/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "jet_angle",
+     "label": "挑角 θ",
+     "unit": "°",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "drop_height",
+     "label": "坎顶至河床高差 h2",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "tailwater_depth",
+     "label": "下游水深 hs",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "scour_coeff",
+     "label": "抗冲系数 k",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《溢洪道设计规范》SL 253、《水工建筑物》教材；挑距与冲坑深度不匹配会造成鼻坎基础淘空、下游护岸破坏。",
+   "examples": [
+    {
+     "title": "挑距与冲坑",
+     "input": "v1=24 m/s，θ=25°，h1=1.8 m，h2=22 m，q=30 m³/(s·m)，Z=25 m，hs=4 m，k=1.3",
+     "output": "L≈[576×0.383+24×0.906×√(576×0.179+19.62×23.4)]/9.81≈(220.6+21.7×22.9)/9.81=73.1 m；T=1.3×√30×25^0.25−4=1.3×5.48×2.24−4=11.9 m"
+    }
+   ]
+  },
+  {
+   "name": "消能防冲计算",
+   "icon": "🛡️",
+   "category": "工程设计",
+   "description": "综合确定消能型式、消力池尺寸、护坦长度与防冲措施，验算消能率与下游河床稳定。",
+   "formula": "1) 消能率：η=(E1−E2)/E1×100%，E1、E2 为消能前后断面比能；\n2) 消力池深 d=σh2−ht−Δz，σ=1.05~1.10，Δz 为池末水面跌落；\n3) 池长 Lk=(0.7~0.8)Lj，Lj=6.9(h2−h1)；\n4) 护坦厚度：t=0.15~0.20·√(q·√(ΔZ))，且≥0.5 m；\n5) 防冲槽/齿墙深度：≥1.0~1.5 m，置于冲刷线以下；\n6) 下游流速校核：v出≤允许不冲流速（岩基 3~5 m/s、砂卵石 1.5~2.5 m/s）。",
+   "formula_note": "消能防冲设计标准按建筑物级别取 3~5 年一遇或 10~20 年一遇；软基宜用底流消能，岩基可用挑流；池内需设排水孔与反滤层。",
+   "variables": [
+    {
+     "key": "unit_discharge",
+     "label": "单宽流量 q",
+     "unit": "m³/(s·m)",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "head_difference",
+     "label": "上下游水位差 ΔZ",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "downstream_depth",
+     "label": "下游水深 ht",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "conjugate_depth",
+     "label": "共轭水深 h2",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "foundation_type",
+     "label": "地基类型",
+     "unit": "",
+     "required": true,
+     "remark": "岩基/软基"
+    }
+   ],
+   "knowledge": "《溢洪道设计规范》SL 253、《水闸设计规范》SL 265；消能不充分是中小型水库溢洪道下游冲毁的主要原因。",
+   "examples": [
+    {
+     "title": "消力池尺寸",
+     "input": "h1=1.2 m，h2=5.6 m，ht=3.4 m，q=18 m³/(s·m)，ΔZ=0.3 m",
+     "output": "d=1.05×5.6−3.4−0.3=2.18 m；Lj=6.9×(5.6−1.2)=30.4 m，Lk=0.8×30.4=24.3 m；护坦厚≥0.15×√(18×√0.3)=0.65 m"
+    }
+   ]
+  },
+  {
+   "name": "护底块石稳定重量计算",
+   "icon": "🪨",
+   "category": "工程设计",
+   "description": "由水流流速与块石密度计算护底（护坦、海漫、丁坝坝头）块石的最小稳定粒径与重量，防止冲刷揭底。",
+   "formula": "1) 起动流速（Shields 型）：vc=1.2·√(g·d·(γs/γw−1))；\n2) 由设计流速反算所需粒径：d≥v²/[1.44·g·(γs/γw−1)]；\n3) 块石重量：G=γs·d³（立方体近似），或按 G=0.1·γs·d³ 计空隙折减；\n4) 护底厚度：t≥1.5d（单层铺砌）、≥2.0d（抛石）；\n5) 校核：v设≤vc/1.2（安全系数）；否则加大粒径或改混凝土护底。",
+   "formula_note": "流速应取护底部位的垂线平均流速（非断面平均）；块石密度取 2.6~2.7 t/m³；重要工程应做水工模型试验验证；抛石护底需设反滤层或土工布。",
+   "variables": [
+    {
+     "key": "flow_velocity",
+     "label": "护底处流速 v",
+     "unit": "m/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "stone_density",
+     "label": "块石密度 γs",
+     "unit": "t/m³",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "water_density",
+     "label": "水密度 γw",
+     "unit": "t/m³",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "safety_factor",
+     "label": "安全系数",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《堤防工程设计规范》GB 50286、《水闸设计规范》SL 265；护底块石失稳是闸下、跌水下游冲刷破坏的典型形式。",
+   "examples": [
+    {
+     "title": "反算粒径",
+     "input": "v=4.0 m/s，γs=2.65 t/m³，γw=1.0",
+     "output": "d≥16/(1.44×9.81×1.65)=0.686 m；G=2.65×0.686³=0.855 t/块；护底厚≥1.37 m"
+    }
+   ]
+  },
+  {
+   "name": "护岸抗冲刷计算",
+   "icon": "🧱",
+   "category": "工程设计",
+   "description": "计算护岸（坡式、墙式）在洪水与船行波作用下的冲刷深度与护脚埋深，确定护岸型式和坡脚防护范围。",
+   "formula": "1) 近岸流速：v=v0·(1−x/B)^(1/6)（岸边垂线修正），或取实测；\n2) 块石起动流速：vc=1.2√(g·d·(γs/γw−1))，要求 vc≥1.2v；\n3) 一般冲刷深度按《堤防工程设计规范》GB 50286 附录 D：hs=hp+(q/(v允·hp))^(n)·hp 型经验式，参数查规范表；\n4) 护脚埋深：h埋=hs+0.5 m，且不小于 1.0 m（砂性土）、1.5 m（粉细砂）；\n5) 护坡厚度：t=K·H·√(Lm/b)，K 查规范附表。",
+   "formula_note": "局部冲刷（丁坝、桥墩、护岸端部）应按专门公式另行计算；弯道凹岸冲刷深度大于凸岸，护脚应加深 20%~30%；船行波影响的运河护岸需另加波高。",
+   "variables": [
+    {
+     "key": "flow_velocity",
+     "label": "近岸流速 v",
+     "unit": "m/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "water_depth",
+     "label": "近岸水深 hp",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "soil_type",
+     "label": "岸坡土质",
+     "unit": "",
+     "required": true,
+     "remark": "砂性土/粉细砂/黏性土"
+    },
+    {
+     "key": "stone_size",
+     "label": "护脚块石粒径 d",
+     "unit": "m",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《堤防工程设计规范》GB 50286、《河道整治设计规范》GB 50707；护脚埋深不足是护岸汛后坍塌的首要原因。",
+   "examples": [
+    {
+     "title": "护脚埋深",
+     "input": "v=2.8 m/s，hp=3.0 m，计算得一般冲刷深度 hs=2.2 m，粉细砂",
+     "output": "h埋=2.2+0.5=2.7 m，但不小于 1.5 m → 取 2.7 m；块石 d≥2.8²/(1.44×9.81×1.65)=0.336 m"
+    }
+   ]
+  },
+  {
+   "name": "上下游护坡厚度计算",
+   "icon": "🧱",
+   "category": "工程设计",
+   "description": "按波浪要素与坡比计算土石坝上游护坡（砌石、混凝土）厚度及下游护坡厚度，满足波浪冲击与冻胀要求。",
+   "formula": "1) 上游护坡厚度（砌石/混凝土）：t=η·H·√(Lm/b)·√(γw/(γc−γw))·(1/√(1+m²))，η=1.0~1.3，b 为板块边长；\n2) 简化控制值：干砌石 0.25~0.35 m、浆砌石 0.30~0.40 m、混凝土 0.15~0.25 m（H≤1.5 m）；\n3) 垫层：碎石 0.15~0.20 m + 砂 0.10 m，或土工布；\n4) 下游护坡：无波浪作用时按构造取 0.20~0.30 m（草皮护坡除外），有雨水冲刷时加厚；\n5) 校核：板块抗浮 K=γc·t·cosα/(γw·H)≥1.1。",
+   "formula_note": "护坡厚度随波高增大而加厚，H>2 m 时宜用混凝土或异形块体；冻胀区应设砂砾垫层并加厚 20%；护坡坡脚应设基座（深≥0.8 m）。",
+   "variables": [
+    {
+     "key": "wave_height",
+     "label": "设计波高 H",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "slope_ratio",
+     "label": "坡比系数 m",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "block_size",
+     "label": "板块边长 b",
+     "unit": "m",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "material",
+     "label": "护坡材料",
+     "unit": "",
+     "required": true,
+     "remark": "干砌石/浆砌石/混凝土"
+    }
+   ],
+   "knowledge": "《碾压式土石坝设计规范》SL 274 附录 A、《小型水利水电工程碾压式土石坝设计规范》SL 189；护坡厚度不足会造成护坡掀翻、坝体淘刷。",
+   "examples": [
+    {
+     "title": "混凝土护坡",
+     "input": "H=1.2 m，m=2.5，Lm=12 m，b=3 m，γc=2.4",
+     "output": "t=1.1×1.2×√(12/3)×√(1.0/1.4)×(1/√7.25)=1.1×1.2×2.0×0.845×0.371=0.83 m（偏厚）→ 按规范最小构造取 0.20 m 并加设垫层"
+    }
+   ]
+  },
+  {
+   "name": "砌石护坡设计计算",
+   "icon": "🧱",
+   "category": "工程设计",
+   "description": "确定干砌石/浆砌石护坡的厚度、块石粒径、垫层与坡脚构造，验算波浪作用下的稳定性。",
+   "formula": "1) 厚度：干砌石 t=0.25~0.35 m；浆砌石 t=0.30~0.40 m（按波高 H 与坡比查规范）；\n2) 块石粒径：d=(0.25~0.35)t，且满足 d≥H/3；\n3) 垫层：碎石 0.15 m + 砂 0.10 m，或 300 g/m² 土工布；\n4) 坡脚：基座顶宽≥0.5 m、埋深≥0.8 m，或抛石棱体；\n5) 稳定：K=γs·t·cosα/(γw·H)≥1.1；浆砌石另验算砂浆强度与分缝（10~15 m）。",
+   "formula_note": "干砌石适用于 H≤1.0 m 的小型工程；浆砌石需设排水孔（间距 2~3 m）；块石应坚硬、未风化，饱和抗压强度≥30 MPa。",
+   "variables": [
+    {
+     "key": "wave_height",
+     "label": "设计波高 H",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "slope_ratio",
+     "label": "坡比系数 m",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "stone_thickness",
+     "label": "护坡厚度 t",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "mortar",
+     "label": "是否浆砌",
+     "unit": "",
+     "required": true,
+     "remark": "干砌/浆砌"
+    }
+   ],
+   "knowledge": "《碾压式土石坝设计规范》SL 274、《砌体结构设计规范》GB 50003；砌石护坡造价低但抗浪能力弱于混凝土。",
+   "examples": [
+    {
+     "title": "干砌石厚度",
+     "input": "H=0.8 m，m=2.0",
+     "output": "t 取 0.30 m；d≥H/3=0.27 m，取 0.30 m；垫层 0.15 m 碎石+0.10 m 砂；坡脚埋深 0.8 m"
+    }
+   ]
+  },
+  {
+   "name": "斜坡堤栅栏板平面尺寸及厚度计算",
+   "icon": "🧱",
+   "category": "工程设计",
+   "description": "确定斜坡式海堤/护岸栅栏板的板块平面尺寸、厚度与配筋，验算波浪浮托与板块稳定。",
+   "formula": "1) 板块平面尺寸：Lp=(1.0~1.5)H，Bp=(0.8~1.2)H，且单块面积 1.0~2.5 m²；\n2) 厚度：t=max(0.15 m, 0.08H·√(Lm/t)) 迭代，常用 0.15~0.25 m；\n3) 浮托稳定：K=γc·t·cosα/(γw·H)≥1.1；\n4) 配筋：按四边简支板，M=α·q·Lp²，q=γw·H（浮托均布），最小配筋率 0.15%；\n5) 缝隙：板间留 20~30 mm 缝，填沥青麻絮或聚氨酯。",
+   "formula_note": "栅栏板适用于 H≤2.5 m 的斜坡堤；坡度陡于 1:1.5 时应减小板尺寸；板下需设 0.2 m 碎石垫层与土工布反滤。",
+   "variables": [
+    {
+     "key": "wave_height",
+     "label": "设计波高 H",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "slope_ratio",
+     "label": "坡比",
+     "unit": "",
+     "required": true,
+     "remark": "如 1:2"
+    },
+    {
+     "key": "plate_thickness",
+     "label": "板厚 t",
+     "unit": "m",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "concrete_density",
+     "label": "混凝土密度",
+     "unit": "t/m³",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《海堤工程设计规范》SL 435、《港口及航道护岸工程设计与施工规范》；栅栏板是斜坡堤常用护面形式，破坏多为浮托掀翻。",
+   "examples": [
+    {
+     "title": "板厚与浮托",
+     "input": "H=1.5 m，坡比 1:2，γc=2.4，t=0.20 m",
+     "output": "Lp=1.5~2.25 m；K=2.4×0.20×0.894/(1.0×1.5)=0.286＜1.1 → 厚度不足，需 t≥0.77 m 或改用异形块体（说明栅栏板不适用于该波高）"
+    }
+   ]
+  },
+  {
+   "name": "预制砼异形块护坡设计计算",
+   "icon": "🧱",
+   "category": "工程设计",
+   "description": "按 Hudson 公式确定护面异形块体（四脚锥、扭工字块等）的重量、层数与铺砌数量，用于斜坡堤与海堤护面。",
+   "formula": "1) Hudson 公式：G=γs·H³/[KD·Δ³·cotα]，Δ=γs/γw−1；\n2) KD 取值：四脚锥 8~10、扭工字块 6~8、钩连块 6~9（按容许失稳率 0~5%）；\n3) 层数：2 层（常用），铺砌块数 n=2·A/(1.1·G/γs)^(2/3) 每 100 m²；\n4) 垫层：0.3~0.5 m 碎石 + 土工布；\n5) 坡脚：抛石棱体宽度≥2H，或埋深≥1.0 m。",
+   "formula_note": "H 取有效波高 Hs（H1/3）或 H13%；γs 取 2.3~2.4 t/m³（混凝土）；KD 与块体形状、安放方式、容许失稳率相关，须按规范表取。",
+   "variables": [
+    {
+     "key": "wave_height",
+     "label": "有效波高 Hs",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "slope_ratio",
+     "label": "坡比 cotα",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "block_type",
+     "label": "块体类型",
+     "unit": "",
+     "required": true,
+     "remark": "四脚锥/扭工字块/钩连块"
+    },
+    {
+     "key": "concrete_density",
+     "label": "块体密度",
+     "unit": "t/m³",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "damage_rate",
+     "label": "容许失稳率",
+     "unit": "%",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《海堤工程设计规范》SL 435、《防波堤设计与施工规范》JTS 154；异形块体咬合性好，抗浪能力显著优于平板。",
+   "examples": [
+    {
+     "title": "四脚锥重量",
+     "input": "Hs=2.5 m，cotα=2，γs=2.35，KD=9",
+     "output": "Δ=1.35；G=2.35×15.6/(9×2.46×2)=36.7/44.3=0.83 t/块"
+    }
+   ]
+  },
+  {
+   "name": "混凝土护坡计算",
+   "icon": "🧱",
+   "category": "工程设计",
+   "description": "确定混凝土护坡的板厚、分缝尺寸、配筋与垫层，验算波浪浮托与温度应力。",
+   "formula": "1) 板厚：t≥0.15 m（构造），并按浮托稳定 K=γc·t·cosα/(γw·H)≥1.1 反算；\n2) 分缝：纵横缝间距 3~5 m，缝宽 20 mm，填沥青麻絮；坡长 >15 m 设横向伸缩缝；\n3) 配筋：构造配筋 φ8@200 双向，配筋率≥0.15%；\n4) 垫层：碎石 0.15 m + 砂 0.10 m 或土工布；\n5) 抗滑：沿坡面下滑力 W·sinα ≤ 摩擦力 f·W·cosα + 支墩抗力。",
+   "formula_note": "护坡与坝体之间应设排水，防止渗透水顶托；北方冻胀区板下宜设 0.3 m 砂砾垫层；分缝过大会导致板块错动。",
+   "variables": [
+    {
+     "key": "wave_height",
+     "label": "设计波高 H",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "slope_angle",
+     "label": "坡角 α",
+     "unit": "°",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "plate_thickness",
+     "label": "板厚 t",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "concrete_density",
+     "label": "混凝土密度",
+     "unit": "t/m³",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《碾压式土石坝设计规范》SL 274、《混凝土结构设计规范》GB 50010；混凝土护坡抗浪性好，但需处理分缝与排水。",
+   "examples": [
+    {
+     "title": "板厚反算",
+     "input": "H=1.5 m，α=21.8°（1:2.5），γc=2.4",
+     "output": "t≥1.1×1.0×1.5/(2.4×0.928)=0.74 m？按浮托公式 K=1.1 反算 t=1.1×1.5/(2.4×0.928)=0.74 m，实际采用 0.25 m 时须靠分缝排水与锚固保证，说明该波高下应改用异形块体"
+    }
+   ]
+  },
+  {
+   "name": "水闸纵剖面结构配置",
+   "icon": "🏗️",
+   "category": "工程设计",
+   "description": "按渗径系数法配置水闸纵剖面：铺盖、闸室底板、护坦、海漫与防冲槽的长度和厚度，满足防渗与消能要求。",
+   "formula": "1) 防渗长度：L=C·ΔH，C 为允许渗径系数（砂土 9~12、砂壤土 7~9、黏土 3~5）；\n2) 地下轮廓：铺盖长 (2~4)ΔH 且≥3 m，厚 0.4~0.6 m；底板长 (1.0~1.5)ΔH；\n3) 消能段：护坦长 (2~3)h2，厚 0.4~0.6 m；海漫长 (3~5)ΔH；\n4) 防冲槽：深 1.0~1.5 m，宽 2~3 m；\n5) 校核：实际地下轮廓长度≥L，且出逸坡降≤允许值。",
+   "formula_note": "渗径系数法为初步布置用，施工图阶段须用改进阻力系数法或有限元复核；铺盖与底板之间设止水；闸基有软弱夹层时应加深防渗。",
+   "variables": [
+    {
+     "key": "head_difference",
+     "label": "上下游水位差 ΔH",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "foundation_type",
+     "label": "地基类型",
+     "unit": "",
+     "required": true,
+     "remark": "砂土/砂壤土/黏土"
+    },
+    {
+     "key": "seepage_coeff",
+     "label": "允许渗径系数 C",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "conjugate_depth",
+     "label": "共轭水深 h2",
+     "unit": "m",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水闸设计规范》SL 265；纵剖面配置合理与否直接决定闸基渗流稳定与下游冲刷安全。",
+   "examples": [
+    {
+     "title": "砂土地基布置",
+     "input": "ΔH=4.0 m，C=10，h2=2.2 m",
+     "output": "L需=40 m；铺盖取 12 m、底板 6 m、护坦 6 m、海漫 16 m，合计 40 m ✓；防冲槽深 1.2 m"
+    }
+   ]
+  },
+  {
+   "name": "水闸渗流稳定计算",
+   "icon": "💧",
+   "category": "工程设计",
+   "description": "用改进阻力系数法计算闸基各段水头损失、底板扬压力与出口坡降，验算闸基渗流稳定。",
+   "formula": "1) 有效深度：L0/S0>5 时 Te=0.5L0，否则 Te=(5L0)/(1.6L0/S0+2)；\n2) 阻力系数：进口/出口段 ξ0=1.5(S/T)^1.5+0.441；内部垂直段 ξy=(2/π)ln[cot(π/4·(1−S/T))]；水平段 ξx=(Lx−0.7(S1+S2))/T；\n3) 水头损失：hi=ξi/Σξ·ΔH；\n4) 出口段修正：β=1.21−1/(12(T'/T)²+2)·(S'/T'+0.059)，β>1 取 1；\n5) 出口坡降：J=h出'/S'，要求 J≤[J]（砂土 0.10~0.15、黏土 0.3~0.5）；\n6) 底板扬压力：按 h 分布积分求 U。",
+   "formula_note": "适用于非岩石地基、地下轮廓为折线型的水闸；板桩尖点水头需按规范修正；岩石地基按裂隙渗流另算。",
+   "variables": [
+    {
+     "key": "head_difference",
+     "label": "上下游水位差 ΔH",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "horizontal_length",
+     "label": "地下轮廓水平投影 L0",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "vertical_length",
+     "label": "地下轮廓垂直投影 S0",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "layer_depth",
+     "label": "透水层深度 T",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "segment_geometry",
+     "label": "各段长度与齿墙深度",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水闸设计规范》SL 265 附录 C；改进阻力系数法是规范规定的闸基渗流标准算法，误差一般不超过 5%。",
+   "examples": [
+    {
+     "title": "两段阻力系数",
+     "input": "ΔH=3.6 m，进口段 S=1.0 m、T=8 m；水平段 Lx=12 m、S1=S2=1.0、T=8 m",
+     "output": "ξ0=1.5×(0.125)^1.5+0.441=0.507；ξx=(12−1.4)/8=1.325；若 Σξ=3.0，则进口 h=0.507/3.0×3.6=0.61 m，水平段 h=1.59 m"
+    }
+   ]
+  },
+  {
+   "name": "水闸防渗稳定计算",
+   "icon": "🛡️",
+   "category": "工程设计",
+   "description": "验算水闸地下轮廓的防渗长度、出口坡降与抗渗稳定，判定是否需要加长铺盖、增设板桩或排水。",
+   "formula": "1) 防渗长度：L实≥C·ΔH；\n2) 出口坡降：J=h出/(S'·T')^0.5 型修正式或 J=h出/S'，与允许坡降 [J] 比较；\n3) 允许坡降：砂土 0.10~0.15、砂壤土 0.15~0.25、黏土 0.30~0.50；\n4) 抗渗稳定系数：K=[J]/J≥1.0；\n5) 不足时措施：加长铺盖 20%~30%、增设板桩（深≥0.5T）、加设反滤排水。",
+   "formula_note": "出口坡降应取最不利水位组合（上游设计水位+下游最低水位）；有反滤层时允许坡降可提高 20%~30%；粉细砂地基易发生管涌，须严格控制。",
+   "variables": [
+    {
+     "key": "head_difference",
+     "label": "水位差 ΔH",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "seepage_length",
+     "label": "实际防渗长度 L实",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "exit_gradient",
+     "label": "出口坡降 J",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "soil_type",
+     "label": "地基土类",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水闸设计规范》SL 265、《堤防工程设计规范》GB 50286；防渗不足会导致闸基管涌、底板顶托破坏。",
+   "examples": [
+    {
+     "title": "抗渗校核",
+     "input": "L实=36 m，ΔH=4.0 m，C=10；J=0.18，砂壤土 [J]=0.20",
+     "output": "L需=40 m＞36 m 不满足 → 铺盖加长 4 m；K=0.20/0.18=1.11≥1.0，坡降满足"
+    }
+   ]
+  },
+  {
+   "name": "扬压力强度系数计算",
+   "icon": "📉",
+   "category": "安全监测",
+   "description": "计算混凝土坝、闸底板、护坦底面的扬压力强度与折减系数，为抗滑稳定与抗浮验算提供荷载。",
+   "formula": "1) 扬压力强度：u=α·γw·H，H 为计算点水头，α 为扬压力折减系数；\n2) 折减系数：坝基帷幕后 α=0.25~0.35，排水后 α=0.15~0.25；无帷幕排水时 α=0.5~1.0；\n3) 分布：上游端 u1=γw·H1，帷幕处 u=α·γw·(H1−h帷)，下游端 u2=γw·H2，分段直线连接；\n4) 合力：U=Σ[(ui+ui+1)/2·Li·B]；\n5) 抗浮：K=G/U≥1.1~1.3（护坦）、≥1.3（闸室）。",
+   "formula_note": "扬压力系数应由渗流计算或观测资料确定，不能一律取规范下限；帷幕、排水失效时应按最不利工况（α 取 0.5 以上）复核。",
+   "variables": [
+    {
+     "key": "upstream_head",
+     "label": "上游水头 H1",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "downstream_head",
+     "label": "下游水头 H2",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "reduction_coeff",
+     "label": "扬压力折减系数 α",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "base_width",
+     "label": "基底宽度 B",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "base_length",
+     "label": "计算段长度 L",
+     "unit": "m",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《混凝土重力坝设计规范》SL 319、《水闸设计规范》SL 265、《大坝安全监测技术规范》SL 601；扬压力是混凝土坝抗滑稳定最敏感的荷载，折减系数取值直接决定断面尺寸。监测中可用实测扬压力反算 α，与设计取值对比判断帷幕排水是否失效。",
+   "examples": [
+    {
+     "title": "底板扬压力",
+     "input": "H1=8 m，H2=1 m，α=0.25（帷幕后），底板宽 12 m",
+     "output": "上游端 u1=78.5 kPa，帷幕后 u=0.25×9.81×7=17.2 kPa，下游端 u2=9.8 kPa；合力 U≈[(78.5+17.2)/2×6+(17.2+9.8)/2×6]×1=368 kN/m"
+    }
+   ]
+  },
+  {
+   "name": "渗流稳定计算",
+   "icon": "💧",
+   "category": "工程设计",
+   "description": "通用渗流稳定验算：由渗透坡降、出逸比降与允许坡降判定流土/管涌风险，给出反滤与排水措施。",
+   "formula": "1) 渗透坡降：J=ΔH/L（或由流网/数值计算得局部 J）；\n2) 临界坡降：流土 Jc=(γs−γw)(1−n)/γw≈1.0（砂）；管涌按细粒含量判别；\n3) 允许坡降：[J]=Jc/K，K=2.0~2.5；\n4) 稳定判别：J≤[J] 安全；\n5) 反滤准则：D15/d85≤4~5，D15/d15≥5，且 D50≤25d50。",
+   "formula_note": "层状地基应逐层验算，取最不利层；地震工况允许坡降降低 20%；反滤层是防止管涌最有效且经济的措施。",
+   "variables": [
+    {
+     "key": "head_difference",
+     "label": "水头差 ΔH",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "seepage_path",
+     "label": "渗径长度 L",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "soil_density",
+     "label": "土粒密度 γs",
+     "unit": "t/m³",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "porosity",
+     "label": "孔隙率 n",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "safety_factor",
+     "label": "安全系数 K",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《碾压式土石坝设计规范》SL 274、《水工建筑物抗震设计标准》GB 51247；渗流稳定破坏多为突发性，是土石坝失事的主要模式之一。",
+   "examples": [
+    {
+     "title": "流土校核",
+     "input": "ΔH=6 m，L=45 m，砂层 γs=2.65、n=0.38",
+     "output": "J=0.133；Jc=(2.65−1)×0.62=1.02；[J]=1.02/2.2=0.46＞0.133 → 安全（K=7.7）"
+    }
+   ]
+  },
+  {
+   "name": "溢洪道渗流安全计算",
+   "icon": "🌊",
+   "category": "工程设计",
+   "description": "验算溢洪道控制段、泄槽底板在上下游水头作用下的抗浮稳定与地基渗流安全。",
+   "formula": "1) 底板扬压力：U=α·γw·ΔH·A，α 按地基与排水取 0.3~1.0；\n2) 抗浮：K=G/U≥1.1~1.3，G 为底板自重（含覆重）；\n3) 地基渗流：J=ΔH/L渗，要求 J≤[J]；\n4) 排水措施：底板下设纵横排水沟（间距 5~10 m）与排水孔（φ50~80 mm，间距 3~5 m）；\n5) 不足时：加厚底板、设锚筋（φ25~32，间距 1.5~2 m）、增设防渗帷幕。",
+   "formula_note": "泄槽底板最不利工况为下游无水或检修期；锚筋应锚入基岩 3~5 m；软基溢洪道应设反滤排水层。",
+   "variables": [
+    {
+     "key": "head_difference",
+     "label": "作用水头差 ΔH",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "plate_thickness",
+     "label": "底板厚度 t",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "plate_area",
+     "label": "计算板块面积 A",
+     "unit": "m²",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "reduction_coeff",
+     "label": "扬压力折减系数",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《溢洪道设计规范》SL 253；底板抗浮不足导致的掀板事故在中小型水库溢洪道中屡见不鲜。",
+   "examples": [
+    {
+     "title": "抗浮验算",
+     "input": "ΔH=5 m，α=0.6，t=0.5 m，γc=24 kN/m³",
+     "output": "U=0.6×9.81×5=29.4 kN/m²；G=24×0.5=12 kN/m²；K=0.41＜1.1 → 需设锚筋或加厚至 1.4 m"
+    }
+   ]
+  },
+  {
+   "name": "土石坝渗流稳定计算",
+   "icon": "🏔️",
+   "category": "工程设计",
+   "description": "计算土石坝浸润线、单宽渗流量与下游出逸坡降，验算坝体与坝基渗流稳定，确定排水体尺寸。",
+   "formula": "1) 浸润线（均质坝、不透水地基）：y²=H1²−(H1²−H2²)x/L；\n2) 单宽渗流：q=k(H1²−H2²)/(2L)；\n3) 下游出逸高度：a0=√(2q·L/k) 型或按褥垫排水公式；\n4) 出逸坡降：J出=a0/L 或由流网量测，要求 J出≤[J]（砂 0.15~0.25、黏土 0.3~0.5）；\n5) 排水体：棱体顶宽≥2 m、高≥1.5 m；褥垫厚 0.5~1.0 m；\n6) 稳定：下游坝坡浸润线以上干区、以下饱和区分别取强度指标。",
+   "formula_note": "应分别计算正常蓄水位、设计洪水位、校核洪水位、库水位骤降四种工况；坝基有强透水层时须用双层地基公式；各向异性按等效 k 处理。",
+   "variables": [
+    {
+     "key": "permeability",
+     "label": "坝体渗透系数 k",
+     "unit": "m/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "upstream_head",
+     "label": "上游水深 H1",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "downstream_head",
+     "label": "下游水深 H2",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "seepage_length",
+     "label": "渗流长度 L",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "drainage_type",
+     "label": "排水型式",
+     "unit": "",
+     "required": true,
+     "remark": "棱体/褥垫/贴坡"
+    }
+   ],
+   "knowledge": "《碾压式土石坝设计规范》SL 274；浸润线过高会降低下游坝坡稳定并造成出逸破坏，是土石坝安全评价的核心指标。",
+   "examples": [
+    {
+     "title": "浸润线与渗流",
+     "input": "k=2×10⁻⁵ m/s，H1=15 m，H2=3 m，L=80 m",
+     "output": "q=2×10⁻⁵×(225−9)/(160)=2.7×10⁻⁵ m³/(s·m)；坝中 x=40 m 处 y=√(225−(216×0.5))=√117=10.8 m"
+    }
+   ]
+  },
+  {
+   "name": "混凝土渗流稳定计算",
+   "icon": "🧱",
+   "category": "工程设计",
+   "description": "验算混凝土坝/闸坝基的渗流稳定：坝基扬压力、软弱夹层渗透坡降与帷幕排水效果。",
+   "formula": "1) 坝基扬压力：按折减系数分段计算，U=Σ[(ui+ui+1)/2·Li]·B；\n2) 抗滑：Kc=f·(ΣW−U)/ΣP≥1.05（基本组合）、≥1.0（特殊组合）；\n3) 软弱夹层渗透坡降：J=ΔH/T夹，要求 J≤[J]（泥化夹层 0.3~0.5）；\n4) 帷幕：深度 0.5~0.7 倍水头，厚度按允许坡降确定；\n5) 排水：孔距 3~5 m，孔径 76~110 mm，深至帷幕以下。",
+   "formula_note": "扬压力折减系数需与帷幕、排水实际效果匹配，不能只按规范下限取值；软弱夹层验算取最不利组合；岩基渗流应按裂隙网络或等效连续介质模型分析。",
+   "variables": [
+    {
+     "key": "head",
+     "label": "上游水头 H",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "base_width",
+     "label": "坝基宽度 B",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "friction_coeff",
+     "label": "抗滑摩擦系数 f",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "vertical_load",
+     "label": "垂直荷载 ΣW",
+     "unit": "kN/m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "horizontal_load",
+     "label": "水平荷载 ΣP",
+     "unit": "kN/m",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《混凝土重力坝设计规范》SL 319、《水工建筑物抗震设计标准》GB 51247；坝基渗流控制失效是混凝土坝失稳的常见诱因。",
+   "examples": [
+    {
+     "title": "抗滑校核",
+     "input": "ΣW=6800 kN/m，U=1500 kN/m，ΣP=4200 kN/m，f=0.65",
+     "output": "Kc=0.65×(6800−1500)/4200=0.82＜1.05 → 不满足，需增大坝体断面或加强帷幕排水降低 U"
+    }
+   ]
+  },
+  {
+   "name": "围堰顶高程计算",
+   "icon": "🚧",
+   "category": "工程设计",
+   "description": "确定施工围堰堰顶高程：设计水位加波浪爬高、风壅增水与安全超高，并分设计/校核工况取大值。",
+   "formula": "1) 堰顶高程：Z顶=Z水位+R+e+A；\n2) 波浪爬高 R 按 SL 274 公式 Rm=KΔKw/√(1+m²)·√(hm·Lm)；\n3) 风壅增水 e=K·W²·D/(2g·Hm)·cosβ；\n4) 安全超高 A：3 级 0.7 m、4~5 级 0.5 m（设计），校核工况 0.4/0.3 m；\n5) 分期围堰：按各期设计洪水位分别计算，取外包线；\n6) 土石围堰顶宽≥3 m（有交通要求≥4.5 m）。",
+   "formula_note": "围堰为临时建筑物，设计标准一般 5~20 年一遇；过水围堰另按过流工况校核；汛期抢筑时应预留 0.3~0.5 m 沉陷与超高。",
+   "variables": [
+    {
+     "key": "water_level",
+     "label": "设计水位",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "wave_runup",
+     "label": "波浪爬高 R",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "wind_setup",
+     "label": "风壅增水 e",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "safety_freeboard",
+     "label": "安全超高 A",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "grade",
+     "label": "围堰级别",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水利水电工程施工组织设计规范》SL 303；围堰顶高程不足将直接导致基坑淹没，是施工期最大的洪水风险。",
+   "examples": [
+    {
+     "title": "土石围堰堰顶",
+     "input": "设计水位 102.4 m，R=0.6 m，e=0.05 m，A=0.5 m",
+     "output": "Z顶=102.4+0.6+0.05+0.5=103.55 m，取 103.6 m"
+    }
+   ]
+  },
+  {
+   "name": "溢洪道施工围堰顶高程计算",
+   "icon": "🚧",
+   "category": "工程设计",
+   "description": "针对溢洪道施工期，按其泄流工况与下游水位确定上游围堰顶高程，兼顾导流与安全超高。",
+   "formula": "1) 上游围堰：Z顶=Z导流水位+R+e+A；导流水位由导流流量经泄流曲线反算；\n2) 若溢洪道参与导流：按 Q=m·ε·B·√(2g)·H0^1.5 反求 H0，得堰前水位；\n3) 下游围堰：Z顶=Z下游水位+A（R、e 较小时可取 0.3~0.5 m）；\n4) 安全超高：土石围堰 0.5~0.7 m，混凝土围堰 0.3~0.5 m；\n5) 校核：按设计洪水与超标准洪水两级复核，超标准时应有应急预案。",
+   "formula_note": "溢洪道施工常与坝体填筑交叉作业，围堰高程须与导流洞、坝体临时断面统一考虑；围堰拆除时间应满足度汛要求。",
+   "variables": [
+    {
+     "key": "diversion_flow",
+     "label": "导流设计流量",
+     "unit": "m³/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "spillway_width",
+     "label": "溢洪道净宽",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "downstream_level",
+     "label": "下游水位",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "safety_freeboard",
+     "label": "安全超高",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水利水电工程施工组织设计规范》SL 303、《溢洪道设计规范》SL 253；施工期度汛是水利工程安全事故高发环节。",
+   "examples": [
+    {
+     "title": "溢洪道导流堰顶",
+     "input": "Q=180 m³/s，B=20 m，m=0.385，ε=0.95，A=0.6 m，R+e=0.3 m",
+     "output": "H0=[180/(0.385×0.95×20×4.429)]^(2/3)=[180/32.4]^(2/3)=3.13 m；Z顶=Z堰顶+3.13+0.3+0.6"
+    }
+   ]
+  },
+  {
+   "name": "坝顶高程计算",
+   "icon": "🏔️",
+   "category": "工程设计",
+   "description": "按 SL 274 计算土石坝坝顶高程：静水位加波浪爬高、风壅增水与安全加高，分四种运用工况取最大值。",
+   "formula": "1) 超高：y=R+e+A（+B 地震安全加高）；\n2) 工况一：设计洪水位+正常运用超高；\n3) 工况二：正常蓄水位+正常运用超高；\n4) 工况三：校核洪水位+非常运用超高；\n5) 工况四：正常蓄水位+非常运用超高+地震安全加高；\n6) 坝顶高程=max(各工况水位+对应 y)，取 0.1 m 进位；防浪墙顶可另计，但坝顶面应高出静水位≥0.5 m。",
+   "formula_note": "A 值：1 级设计 1.5 m/校核 0.7 m，2 级 1.0/0.5，3 级 0.7/0.4，4~5 级 0.5/0.3（山区丘陵）；平原滨海区另有规定；R 取累积频率 1%（1、2 级）或 5%（3~5 级）。",
+   "variables": [
+    {
+     "key": "design_flood_level",
+     "label": "设计洪水位",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "normal_level",
+     "label": "正常蓄水位",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "check_flood_level",
+     "label": "校核洪水位",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "wave_runup",
+     "label": "波浪爬高 R",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "wind_setup",
+     "label": "风壅增水 e",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "safety_freeboard",
+     "label": "安全加高 A",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "seismic_freeboard",
+     "label": "地震安全加高 B",
+     "unit": "m",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《碾压式土石坝设计规范》SL 274 第 5.3 节；坝顶高程是土石坝防洪安全的第一道防线，复核不足需加高或增设防浪墙。",
+   "examples": [
+    {
+     "title": "三工况取大值",
+     "input": "正常蓄水位 122.0、设计洪水位 123.6、校核 125.2 m；R正常=0.8、R非常=0.5；e=0.06；A正常=0.7、A非常=0.4",
+     "output": "工况一：123.6+0.8+0.06+0.7=125.16；工况二：122.0+1.56=123.56；工况三：125.2+0.5+0.06+0.4=126.16 → 坝顶 126.2 m"
+    }
+   ]
+  },
+  {
+   "name": "水库坝顶高程复核计算",
+   "icon": "📏",
+   "category": "工程设计",
+   "description": "对已建水库按现行规范复核坝顶高程是否满足防洪要求，输出各工况所需高程与现状差值、加高建议。",
+   "formula": "1) 收集现状：坝顶高程、防浪墙顶高程、特征水位（正常、设计、校核、汛限）；\n2) 按 SL 274 计算各工况所需坝顶高程（同坝顶高程计算卡）；\n3) 差值：ΔZi=Z需,i−Z现状；\n4) 判定：ΔZ≤0 满足；0<ΔZ≤0.5 m 可结合防浪墙评定；ΔZ>0.5 m 应加高或降低汛限水位；\n5) 补充校核：坝顶宽度、防浪墙稳定、坝坡抗滑与渗流是否同步满足；\n6) 输出复核表与结论建议。",
+   "formula_note": "复核须用最新淤积地形与泄流能力曲线（泄流能力衰减会抬高设计洪水位）；防浪墙不能替代坝顶高程的结构安全；结论应明确是否影响大坝安全类别。",
+   "variables": [
+    {
+     "key": "crest_elevation",
+     "label": "现状坝顶高程",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "flood_levels",
+     "label": "各特征水位",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "wave_parameters",
+     "label": "波浪爬高与风壅增水",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "safety_freeboard",
+     "label": "安全加高",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "dam_grade",
+     "label": "工程级别",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水库大坝安全评价导则》SL 258、《碾压式土石坝设计规范》SL 274；坝顶高程复核是大坝安全鉴定的必做专题。",
+   "examples": [
+    {
+     "title": "复核结论",
+     "input": "现状坝顶 126.0 m，复核所需 126.2 m",
+     "output": "ΔZ=0.2 m≤0.5 m，可通过加高防浪墙 0.3 m 或降低汛限水位 0.2 m 解决，判定基本满足"
+    }
+   ]
+  },
+  {
+   "name": "围堰稳定计算",
+   "icon": "🚧",
+   "category": "工程设计",
+   "description": "验算土石围堰与混凝土围堰的抗滑、抗倾与边坡稳定，确定断面尺寸与防冲措施。",
+   "formula": "1) 抗滑：Kc=f·ΣW/ΣP≥1.10~1.25（土石围堰）、≥1.05（混凝土）；\n2) 抗倾：K0=ΣMR/ΣM0≥1.3~1.5；\n3) 边坡稳定（圆弧法）：Fs=Σ(c·li+Wi·cosθi·tanφi)/ΣWi·sinθi≥1.15~1.25；\n4) 渗透稳定：J出≤[J]，设反滤与排水；\n5) 抗冲：迎水面护坡块石 d≥v²/(1.44gΔ)，坡脚防冲槽深≥1.0 m。",
+   "formula_note": "围堰为临时建筑物，安全系数可略低于永久建筑物但不应低于规范下限；过水围堰应按过流工况验算堰面抗冲；汛前应完成备料与抢险预案。",
+   "variables": [
+    {
+     "key": "vertical_load",
+     "label": "自重 ΣW",
+     "unit": "kN/m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "horizontal_load",
+     "label": "水平荷载 ΣP",
+     "unit": "kN/m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "friction_coeff",
+     "label": "基底摩擦系数 f",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "slope_angle",
+     "label": "边坡坡角",
+     "unit": "°",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "soil_strength",
+     "label": "土体 c、φ",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水利水电工程施工组织设计规范》SL 303、《碾压式土石坝设计规范》SL 274；围堰失稳会造成基坑淹水与工期损失。",
+   "examples": [
+    {
+     "title": "抗滑验算",
+     "input": "ΣW=520 kN/m，ΣP=210 kN/m，f=0.45",
+     "output": "Kc=0.45×520/210=1.11≥1.10 → 满足（余度小，建议放缓边坡或加宽堰顶）"
+    }
+   ]
+  },
+  {
+   "name": "溢洪道抗滑稳定计算",
+   "icon": "⚖️",
+   "category": "工程设计",
+   "description": "验算溢洪道控制段、闸室等实体结构沿基底的抗滑稳定，含基本组合与特殊组合两种工况。",
+   "formula": "1) 抗滑安全系数：Kc=f·ΣW/ΣP；\n2) 计入扬压力时：Kc=f·(ΣW−U)/ΣP；\n3) 容许值：基本组合 [Kc]=1.05、特殊组合 1.00（岩基）；软基相应提高 0.05~0.10；\n4) 深层抗滑：沿软弱夹层验算，Kc=(f·ΣN+c·L)/ΣT；\n5) 不足时：增大基底宽度、设齿墙（深 0.5~1.0 m）、加锚筋或改善排水降低 U。",
+   "formula_note": "ΣP 应计入水压力、土压力、地震惯性力；f 取基底与地基的摩擦系数（混凝土/岩基 0.6~0.7、混凝土/砂 0.4~0.5）；深层抗滑须取最不利夹层。",
+   "variables": [
+    {
+     "key": "vertical_load",
+     "label": "垂直荷载 ΣW",
+     "unit": "kN/m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "horizontal_load",
+     "label": "水平荷载 ΣP",
+     "unit": "kN/m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "uplift",
+     "label": "扬压力 U",
+     "unit": "kN/m",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "friction_coeff",
+     "label": "摩擦系数 f",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "foundation",
+     "label": "地基类型",
+     "unit": "",
+     "required": true,
+     "remark": "岩基/软基"
+    }
+   ],
+   "knowledge": "《溢洪道设计规范》SL 253、《水闸设计规范》SL 265；抗滑不足是溢洪道闸室汛期位移、止水撕裂的直接原因。",
+   "examples": [
+    {
+     "title": "岩基抗滑",
+     "input": "ΣW=4200 kN/m，U=600 kN/m，ΣP=2600 kN/m，f=0.65",
+     "output": "Kc=0.65×(4200−600)/2600=0.90＜1.05 → 需加宽底板或设齿墙、加强排水"
+    }
+   ]
+  },
+  {
+   "name": "溢洪道两侧导墙稳定计算",
+   "icon": "🧱",
+   "category": "工程设计",
+   "description": "验算溢洪道边墙（导墙）在侧向水压力、土压力与扬压力作用下的抗滑、抗倾与基底应力。",
+   "formula": "1) 侧向压力：静水 P=0.5γw·H²；土压力 Ea=0.5γ·H²·Ka，Ka=tan²(45°−φ/2)；\n2) 抗滑：Kc=f·ΣG/ΣH≥1.30（基本）、1.10（特殊）；\n3) 抗倾：K0=ΣMG/ΣMq≥1.50；\n4) 基底应力：σmax,min=ΣG/B·(1±6e/B)，要求 σmax≤[σ]、σmin≥0（岩基）或≥σmin允许（软基）；\n5) 墙身强度：按偏心受压构件验算，裂缝宽度≤0.25 mm。",
+   "formula_note": "墙后应设排水孔与反滤，否则须按全部水头计算；地震工况计入动土压力增量；高导墙应分段设缝（10~15 m）。",
+   "variables": [
+    {
+     "key": "wall_height",
+     "label": "墙高 H",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "water_depth",
+     "label": "墙前水深",
+     "unit": "m",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "backfill_props",
+     "label": "墙后填土 γ、φ",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "wall_width",
+     "label": "墙底宽 B",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "friction_coeff",
+     "label": "基底摩擦系数 f",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《溢洪道设计规范》SL 253、《水工挡土墙设计规范》SL 379；导墙倾覆会造成泄槽过流断面突变与水流冲击。",
+   "examples": [
+    {
+     "title": "抗倾验算",
+     "input": "ΣMG=1860 kN·m/m，ΣMq=1120 kN·m/m",
+     "output": "K0=1.66≥1.50 → 满足；再算基底应力 e=B/2−ΣMG−ΣMq)/ΣG 判定是否脱空"
+    }
+   ]
+  },
+  {
+   "name": "挡土墙稳定计算",
+   "icon": "🧱",
+   "category": "工程设计",
+   "description": "按朗肯或库仑土压力计算重力式、悬臂式挡土墙的抗滑、抗倾与地基承载力，确定断面尺寸。",
+   "formula": "1) 主动土压力：Ea=0.5γH²Ka，Ka=tan²(45°−φ/2)；粘性土 Ka 计入 2c√Ka；\n2) 抗滑：Kc=f·ΣG/Ea≥1.30；\n3) 抗倾：K0=(G·xG)/(Ea·H/3)≥1.50；\n4) 基底应力：σmax,min=ΣG/B(1±6e/B)，e=B/2−(ΣMG−ΣMq)/ΣG，要求 e≤B/6；\n5) 墙身：抗弯、抗剪与裂缝宽度验算。",
+   "formula_note": "墙后填土应分层取指标，地下水位以下用浮重度并计静水压力；地震区按动土压力增大 10%~20%；墙踵板宽度宜取 (0.4~0.7)H。",
+   "variables": [
+    {
+     "key": "wall_height",
+     "label": "墙高 H",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "soil_weight",
+     "label": "填土重度 γ",
+     "unit": "kN/m³",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "friction_angle",
+     "label": "内摩擦角 φ",
+     "unit": "°",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "cohesion",
+     "label": "粘聚力 c",
+     "unit": "kPa",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "wall_width",
+     "label": "墙底宽 B",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "friction_coeff",
+     "label": "基底摩擦系数 f",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《建筑边坡工程技术规范》GB 50330、《水工挡土墙设计规范》SL 379；挡土墙失稳多因排水不畅导致墙后水压力骤增。",
+   "examples": [
+    {
+     "title": "主动土压力",
+     "input": "H=5 m，γ=18 kN/m³，φ=30°",
+     "output": "Ka=tan²30°=0.333；Ea=0.5×18×25×0.333=75 kN/m，作用点距底 1.67 m"
+    }
+   ]
+  },
+  {
+   "name": "闸室稳定计算",
+   "icon": "🏗️",
+   "category": "工程设计",
+   "description": "验算水闸闸室的抗滑、抗浮与基底应力，控制不均匀沉降与闸室倾斜。",
+   "formula": "1) 抗滑：Kc=f·(ΣG+ΣPv−U)/ΣPh≥1.25（完建期）、1.10（运用期）；\n2) 抗浮：Kf=ΣG/U≥1.10（完建期）、1.05（运用期）；\n3) 基底应力：σmax,min=ΣG/A(1±6e/B)，不均匀系数 η=σmax/σmin≤1.5（砂基）、2.0（粘性土基）；\n4) 沉降：按分层总和法计算，闸室与翼墙差异沉降≤50 mm；\n5) 不足时：加长底板、设齿墙、调整闸孔布置或地基处理。",
+   "formula_note": "荷载组合应分别计算完建期（无水）、正常运用、检修、地震四种；扬压力按改进阻力系数法成果；软基闸室应做沉降计算并预留超高。",
+   "variables": [
+    {
+     "key": "vertical_load",
+     "label": "结构自重 ΣG",
+     "unit": "kN",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "horizontal_load",
+     "label": "水平水压力 ΣPh",
+     "unit": "kN",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "uplift",
+     "label": "扬压力 U",
+     "unit": "kN",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "base_area",
+     "label": "底板面积 A",
+     "unit": "m²",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "base_width",
+     "label": "顺水流向底板宽 B",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水闸设计规范》SL 265；闸室不均匀沉降会造成闸门卡阻、止水失效，是水闸常见病险。",
+   "examples": [
+    {
+     "title": "抗浮与应力",
+     "input": "ΣG=9600 kN，U=7200 kN，A=180 m²，B=12 m，偏心距 e=0.6 m",
+     "output": "Kf=1.33≥1.05 ✓；σmax=53.3×(1+0.3)=69.3 kPa、σmin=37.3 kPa，η=1.86＜2.0（粘性土）✓"
+    }
+   ]
+  },
+  {
+   "name": "岸墙、翼墙稳定计算",
+   "icon": "🧱",
+   "category": "工程设计",
+   "description": "验算水闸岸墙、上下游翼墙在侧向土压力与水压力下的稳定与基底应力，兼作挡土与防渗结构。",
+   "formula": "1) 侧压力：墙后填土 Ea=0.5γH²Ka，水位以下用浮重度并叠加静水压力；\n2) 抗滑：Kc=f·ΣG/ΣH≥1.30；\n3) 抗倾：K0=ΣMG/ΣMq≥1.50；\n4) 基底应力：σmax,min=ΣG/B(1±6e/B)，e≤B/6；\n5) 防渗：墙身与底板止水连续，墙后设反滤排水；\n6) 与闸室连接处设沉降缝，缝内设止水。",
+   "formula_note": "翼墙多为八字形或圆弧形，应按分段（每 10~15 m）分别验算；墙后填土压实度≥0.94，避免后期沉降开裂；挡水侧与挡土侧工况应分别计算。",
+   "variables": [
+    {
+     "key": "wall_height",
+     "label": "墙高 H",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "soil_props",
+     "label": "填土 γ、φ",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "water_level_diff",
+     "label": "墙前后水位差",
+     "unit": "m",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "wall_width",
+     "label": "墙底宽 B",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "friction_coeff",
+     "label": "摩擦系数 f",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水闸设计规范》SL 265；翼墙稳定与止水质量直接决定闸室两侧的渗流安全与边坡稳定。",
+   "examples": [
+    {
+     "title": "翼墙抗滑",
+     "input": "ΣG=1850 kN/m，Ea=620 kN/m，静水压力 210 kN/m，f=0.45",
+     "output": "ΣH=830 kN/m；Kc=0.45×1850/830=1.00＜1.30 → 需加宽基底或设齿墙（增加被动土压力）"
+    }
+   ]
+  },
+  {
+   "name": "坝体建基面应力计算",
+   "icon": "📐",
+   "category": "工程设计",
+   "description": "计算混凝土坝建基面的垂直应力、剪应力与主应力，验算坝踵不出现拉应力、坝趾不超地基承载力。",
+   "formula": "1) 垂直应力：σy=ΣW/B±6ΣM/B²（ΣM 对建基面形心取矩）；\n2) 剪应力：τ=(ΣP−f·ΣW)/B（抗滑余度法）；\n3) 主应力：σ1,2=σy/2±√((σy/2)²+τ²)；\n4) 控制条件：坝踵 σy≥0（或≥−0.1 MPa 特殊组合）、坝趾 σy≤[σ地基]；\n5) 抗滑：Kc=f·ΣW/ΣP≥1.05；\n6) 深层抗滑另按夹层验算。",
+   "formula_note": "应力按材料力学法（截面假定平截面）计算，高坝应用有限元复核；地震工况允许坝踵出现小拉应力但≤0.2 MPa；扬压力应作为荷载计入。",
+   "variables": [
+    {
+     "key": "vertical_load",
+     "label": "ΣW",
+     "unit": "kN/m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "moment",
+     "label": "ΣM",
+     "unit": "kN·m/m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "base_width",
+     "label": "建基面宽度 B",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "horizontal_load",
+     "label": "ΣP",
+     "unit": "kN/m",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "friction_coeff",
+     "label": "f",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《混凝土重力坝设计规范》SL 319；建基面拉应力是坝踵开裂、扬压力增大的根源。",
+   "examples": [
+    {
+     "title": "坝踵坝趾应力",
+     "input": "ΣW=9800 kN/m，ΣM=12000 kN·m/m，B=22 m",
+     "output": "σ=445±148.8 kPa → 坝趾 594 kPa、坝踵 296 kPa，均受压 ✓；再与地基承载力 800 kPa 比较"
+    }
+   ]
+  },
+  {
+   "name": "混凝土坝断面抗滑稳定计算",
+   "icon": "⚖️",
+   "category": "工程设计",
+   "description": "按抗剪断强度公式验算混凝土重力坝沿建基面与深层软弱面的抗滑稳定，确定坝体断面。",
+   "formula": "1) 抗剪断公式：K'=(f'·ΣW+c'·A)/ΣP；\n2) 抗剪公式（安全储备）：Kc=f·ΣW/ΣP；\n3) 容许值：基本组合 K'≥3.0、Kc≥1.05；特殊组合 K'≥2.5、Kc≥1.00；\n4) 计入扬压力：以 (ΣW−U) 替代 ΣW；\n5) 深层：沿软弱夹层取 c'、f' 计算，夹层存在时须专门论证；\n6) 不足时：坝体加宽、坝踵设齿槽、帷幕排水降低 U。",
+   "formula_note": "f'、c' 取坝基岩体抗剪断参数，应由试验或工程类比确定，不能直接套用规范下限；缓倾角软弱夹层是深层抗滑的控制性因素。",
+   "variables": [
+    {
+     "key": "vertical_load",
+     "label": "ΣW",
+     "unit": "kN/m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "horizontal_load",
+     "label": "ΣP",
+     "unit": "kN/m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "uplift",
+     "label": "扬压力 U",
+     "unit": "kN/m",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "friction_coeff",
+     "label": "抗剪断 f'",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "cohesion",
+     "label": "抗剪断 c'",
+     "unit": "MPa",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "base_area",
+     "label": "建基面面积 A",
+     "unit": "m²/m",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《混凝土重力坝设计规范》SL 319、《水工建筑物抗震设计标准》GB 51247；抗剪断公式是我国重力坝设计的规定方法。",
+   "examples": [
+    {
+     "title": "抗剪断安全系数",
+     "input": "ΣW=9800、U=1600 kN/m，ΣP=6200 kN/m，f'=0.9，c'=0.9 MPa，A=22 m²/m",
+     "output": "K'=(0.9×8200+900×22)/6200=(7380+19800)/6200=4.38≥3.0 ✓"
+    }
+   ]
+  },
+  {
+   "name": "土石坝上下游坝坡稳定计算",
+   "icon": "🏔️",
+   "category": "工程设计",
+   "description": "用瑞典圆弧法或简化毕肖普法验算土石坝上、下游坝坡在正常、非常与地震工况下的抗滑稳定。",
+   "formula": "1) 瑞典圆弧法：Fs=Σ(c'·li+Wi·cosθi·tanφ')/ΣWi·sinθi；\n2) 简化毕肖普：Fs=Σ[(c'·bi+(Wi−ui·bi)tanφ')/mθ]/ΣWi·sinθi，mθ=cosθ+sinθ·tanφ'/Fs（迭代）；\n3) 容许值：正常运用 1.30~1.50、非常运用 1.15~1.25、地震工况 1.10~1.15（按坝级）；\n4) 搜索最危险滑弧（圆心网格 + 半径优化）；\n5) 稳定渗流期用有效应力指标，水位骤降用总应力指标。",
+   "formula_note": "坝坡稳定是土石坝设计的控制条件；水位骤降工况（降速>1 m/d）最危险；地震工况用拟静力法叠加水平地震系数；取最不利滑弧而非固定圆弧。",
+   "variables": [
+    {
+     "key": "slope_ratio",
+     "label": "坝坡坡比",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "soil_strength",
+     "label": "c'、φ'",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "unit_weight",
+     "label": "土体重度",
+     "unit": "kN/m³",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "pore_pressure",
+     "label": "孔隙水压力/浸润线",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "seismic_coeff",
+     "label": "地震系数",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《碾压式土石坝设计规范》SL 274、《水工建筑物抗震设计标准》GB 51247；坝坡失稳是土石坝最典型溃坝模式。",
+   "examples": [
+    {
+     "title": "瑞典法算例",
+     "input": "某滑弧 ΣWi·sinθ=4200 kN/m，Σ(c'·li+Wi·cosθ·tanφ')=5460 kN/m",
+     "output": "Fs=5460/4200=1.30 → 满足正常运用 1.30 下限（无余度，建议放缓坝坡）"
+    }
+   ]
+  },
+  {
+   "name": "地基整体稳定性计算",
+   "icon": "🏗️",
+   "category": "工程设计",
+   "description": "验算建筑物与地基的整体滑动、承载力与深层滑动稳定，含圆弧滑动与沿软弱层滑动两种模式。",
+   "formula": "1) 承载力：pk≤fak，pk=(Fk+Gk)/A，偏心时 pkmax≤1.2fak；\n2) 圆弧滑动：Fs=Σ(c·li+Ni·tanφ)/ΣTi≥1.30；\n3) 沿软弱层滑动：Fs=(c·L+ΣN·tanφ)/ΣT；\n4) 抗浮：K=G/U≥1.05~1.10；\n5) 沉降：分层总和法 s=Σ(Δσi/Esi)·hi，差异沉降≤0.002~0.003L。",
+   "formula_note": "地基承载力特征值应由载荷试验或原位测试确定；软土地区须验算长期固结沉降；有软弱夹层时整体稳定由夹层控制。",
+   "variables": [
+    {
+     "key": "foundation_pressure",
+     "label": "基底平均压力 pk",
+     "unit": "kPa",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "bearing_capacity",
+     "label": "地基承载力特征值 fak",
+     "unit": "kPa",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "soil_strength",
+     "label": "c、φ",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "surcharge",
+     "label": "边载/超载",
+     "unit": "kPa",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《建筑地基基础设计规范》GB 50007、《水闸设计规范》SL 265；地基整体失稳往往伴随大量沉降与结构开裂。",
+   "examples": [
+    {
+     "title": "承载力校核",
+     "input": "pk=145 kPa，fak=130 kPa，偏心",
+     "output": "pk=145＞130 → 不满足；需地基处理或加大基础面积，使 pk≤130、pkmax≤156"
+    }
+   ]
+  },
+  {
+   "name": "抗震计算",
+   "icon": "🌐",
+   "category": "工程设计",
+   "description": "按拟静力法计算水工建筑物的地震惯性力、动水压力与地震工况组合，验算抗滑、应力与坝坡稳定。",
+   "formula": "1) 设计地震加速度：αh=β·αmax，αmax 按场地烈度查表（7 度 0.10g、8 度 0.20g）；\n2) 地震惯性力：Fi=αh·ξ·Gi·αi/g，ξ 为地震作用效应折减系数（0.25），αi 为分布系数；\n3) 地震动水压力：Pw=0.65·αh·γw·H²（直立面近似）；\n4) 组合：正常荷载+地震惯性力+动水压力，材料强度取设计值；\n5) 容许值：抗滑 Kc≥1.00、坝坡 Fs≥1.10~1.15、坝踵拉应力≤0.2 MPa。",
+   "formula_note": "按《水工建筑物抗震设计标准》GB 51247，甲类建筑物需做动力分析；土石坝用拟静力法时地震系数取 αh/2；液化地基须专门评价。",
+   "variables": [
+    {
+     "key": "seismic_intensity",
+     "label": "地震烈度",
+     "unit": "度",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "peak_acceleration",
+     "label": "设计地震加速度 αmax",
+     "unit": "g",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "structure_weight",
+     "label": "结构自重 Gi",
+     "unit": "kN",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "dynamic_water",
+     "label": "动水压力",
+     "unit": "kN",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水工建筑物抗震设计标准》GB 51247；地震工况是坝体断面与坝坡稳定的重要控制组合。",
+   "examples": [
+    {
+     "title": "惯性力",
+     "input": "7 度区 αmax=0.10g，ξ=0.25，坝段重 G=12000 kN，αi=1.0",
+     "output": "Fi=0.10×0.25×12000×1.0=300 kN，作用于坝段重心"
+    }
+   ]
+  },
+  {
+   "name": "结构应力计算",
+   "icon": "📐",
+   "category": "工程设计",
+   "description": "计算水工混凝土构件的拉、压、弯、剪应力并进行组合，验算配筋与裂缝，适用于闸墩、胸墙、底板等。",
+   "formula": "1) 轴力：σ=N/A；\n2) 弯曲：σ=M/W，W=bh²/6（矩形）；\n3) 偏心受压：σ=N/A±M/W；\n4) 剪应力：τ=V/(b·h0)；\n5) 主拉应力：σ1=σ/2+√((σ/2)²+τ²)，要求≤ft；\n6) 组合：S=γ0·ψ·Σ(γGi·SGik+γQj·SQjk)，按承载力极限状态验算。",
+   "formula_note": "水工混凝土结构按《水工混凝土结构设计规范》SL 191，承载能力与正常使用两种极限状态都要验算；温度与收缩应力对薄壁结构不可忽略。",
+   "variables": [
+    {
+     "key": "axial_force",
+     "label": "轴力 N",
+     "unit": "kN",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "moment",
+     "label": "弯矩 M",
+     "unit": "kN·m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "shear",
+     "label": "剪力 V",
+     "unit": "kN",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "section",
+     "label": "截面尺寸 b×h",
+     "unit": "mm",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "material",
+     "label": "混凝土强度等级",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水工混凝土结构设计规范》SL 191；应力成果是配筋、裂缝宽度与结构厚度确定的直接依据。",
+   "examples": [
+    {
+     "title": "矩形截面弯应力",
+     "input": "M=180 kN·m，b=1000 mm，h=600 mm",
+     "output": "W=bh²/6=6.0×10⁷ mm³；σ=180×10⁶/6.0×10⁷=3.0 N/mm²（C25 ft=1.27，需配筋）"
+    }
+   ]
+  },
+  {
+   "name": "坝体内部应力计算",
+   "icon": "📐",
+   "category": "工程设计",
+   "description": "用材料力学法计算重力坝坝体各水平截面的垂直应力、剪应力与主应力分布，校核坝体强度。",
+   "formula": "1) 截面垂直应力：σy=ΣW/B±6ΣM/B²（含扬压力）；\n2) 剪应力：τ=(ΣP−f·ΣW)/B 或 τ=(σy−p)·tanφ；\n3) 水平正应力：σx=p+(σy−p)·tan²φ1（上游面）、p'+(σy−p')·tan²φ2（下游面）；\n4) 主应力：σ1,2=(σx+σy)/2±√(((σx−σy)/2)²+τ²)；\n5) 控制：坝体上游面主拉应力≤0.5 MPa（特殊组合），压应力≤混凝土允许值；\n6) 高坝应用有限元校核。",
+   "formula_note": "材料力学法假定截面应力直线分布，适用于坝高 <70 m 的重力坝；坝体分区（上游防渗、下游护面）混凝土强度等级不同应分别验算。",
+   "variables": [
+    {
+     "key": "section_height",
+     "label": "计算截面高程",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "vertical_load",
+     "label": "截面上 ΣW",
+     "unit": "kN/m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "moment",
+     "label": "ΣM",
+     "unit": "kN·m/m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "section_width",
+     "label": "截面宽度 B",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "upstream_slope",
+     "label": "上游面坡比",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《混凝土重力坝设计规范》SL 319；坝体内部应力控制坝体混凝土分区与坝内廊道布置。",
+   "examples": [
+    {
+     "title": "截面应力",
+     "input": "ΣW=5400 kN/m，ΣM=4200 kN·m/m，B=14 m",
+     "output": "σy=385.7±128.6 kPa → 上游 257.1、下游 514.3 kPa，均受压"
+    }
+   ]
+  },
+  {
+   "name": "防渗墙应力应变计算",
+   "icon": "🧱",
+   "category": "工程设计",
+   "description": "计算混凝土防渗墙在坝体荷载、水压力与地基变形作用下的应力与应变，确定墙厚、材料与接头形式。",
+   "formula": "1) 弹性阶段：σ=E·ε，E 取混凝土弹性模量（C20 约 2.55×10⁴ MPa）；\n2) 墙身压应力：σ=N/A+M/W，N 为竖向荷载（墙体自重+顶部荷载）；\n3) 水压力弯矩：按弹性地基梁或有限元计算，Mmax≈(0.05~0.10)γw·H³；\n4) 允许压应力：[σ]=0.25fck（考虑长期与施工缺陷）；\n5) 接头应变：Δ=σ·L/E，要求≤接头允许变形（1~2 cm）；\n6) 墙厚：t≥H/30~H/40，常用 0.6~1.2 m。",
+   "formula_note": "防渗墙是隐蔽工程，应力计算应以有限元为主；墙体材料宜用低弹模混凝土（E≤2×10⁴ MPa）以适应变形；接头形式（柔性/刚性）影响应力集中。",
+   "variables": [
+    {
+     "key": "wall_depth",
+     "label": "墙深 H",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "wall_thickness",
+     "label": "墙厚 t",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "elastic_modulus",
+     "label": "弹性模量 E",
+     "unit": "MPa",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "water_head",
+     "label": "作用水头",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "top_load",
+     "label": "顶部荷载",
+     "unit": "kN/m",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水利水电工程混凝土防渗墙施工技术规范》SL 174；防渗墙开裂会导致坝基渗漏通道，且修复困难。",
+   "examples": [
+    {
+     "title": "墙身压应力",
+     "input": "墙厚 0.8 m，墙深 40 m，混凝土 γ=24 kN/m³，顶部荷载 120 kN/m",
+     "output": "N=0.8×40×24+120=888 kN/m；A=0.8 m² → σ=1110 kPa=1.11 MPa＜0.25×13.4=3.35 MPa ✓"
+    }
+   ]
+  },
+  {
+   "name": "荷载计算",
+   "icon": "📋",
+   "category": "工程设计",
+   "description": "汇总水工建筑物的自重、静水压力、扬压力、土压力、浪压力、冰压力与地震作用，形成荷载组合表。",
+   "formula": "1) 自重：G=γc·V（混凝土 24 kN/m³、钢筋混凝土 25）；\n2) 静水压力：P=0.5γw·H²，垂直作用于迎水面；\n3) 扬压力：U=α·γw·ΔH·A；\n4) 土压力：Ea=0.5γH²Ka（主动）、Ep=0.5γH²Kp（被动）；\n5) 浪压力：按立波或破碎波公式；\n6) 地震：Fi=αh·ξ·Gi；\n7) 组合：基本组合（自重+静水+扬压力+土压力）、特殊组合（+校核洪水/地震），分项系数按 SL 191 取。",
+   "formula_note": "荷载组合必须完整，遗漏扬压力或浪压力是常见的偏危险错误；施工期、完建期、运用期、检修期应分别组合；冰压力仅在严寒地区计入。",
+   "variables": [
+    {
+     "key": "structure_volume",
+     "label": "结构体积/尺寸",
+     "unit": "m³",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "water_levels",
+     "label": "上下游水位",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "soil_props",
+     "label": "填土 γ、φ",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "seismic_intensity",
+     "label": "地震烈度",
+     "unit": "度",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "ice_thickness",
+     "label": "冰层厚度",
+     "unit": "m",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水工混凝土结构设计规范》SL 191、《混凝土重力坝设计规范》SL 319；荷载组合是全部稳定与应力验算的起点。",
+   "examples": [
+    {
+     "title": "静水压力",
+     "input": "H=6 m，γw=9.81 kN/m³",
+     "output": "P=0.5×9.81×36=176.6 kN/m，作用点距基底 2.0 m"
+    }
+   ]
+  },
+  {
+   "name": "衬砌厚度及配筋计算",
+   "icon": "🔩",
+   "category": "工程设计",
+   "description": "确定隧洞、渠道混凝土衬砌的厚度与配筋，验算内水压力、外水压力与围岩压力组合下的强度与裂缝。",
+   "formula": "1) 厚度：t≥D/20+0.10 m（构造），常用 0.3~0.6 m；\n2) 内水压力环向应力：σθ=p·r/t，要求 σθ≤ftk/γd；\n3) 配筋：As=M/(0.9·fy·h0)，最小配筋率 0.2%（受弯）、0.4%（偏心受压）；\n4) 裂缝宽度：wmax=αcr·ψ·σs/Es·(1.9c+0.08deq/ρte)≤0.25 mm；\n5) 抗外压：外水压力+围岩压力下验算抗浮与压屈，必要时设排水。",
+   "formula_note": "围岩完整性好时可按构造配筋；IV、V 类围岩需按荷载结构法计算；内水压力大时宜采用预应力或钢衬；外水压力取值应有勘察依据。",
+   "variables": [
+    {
+     "key": "tunnel_diameter",
+     "label": "洞径/断面尺寸 D",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "internal_pressure",
+     "label": "内水压力 p",
+     "unit": "MPa",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "concrete_grade",
+     "label": "混凝土强度等级",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "rebar_grade",
+     "label": "钢筋级别",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "surrounding_rock",
+     "label": "围岩类别",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水工隧洞设计规范》SL 279、《水工混凝土结构设计规范》SL 191；衬砌厚度不足会导致开裂渗漏与围岩软化。",
+   "examples": [
+    {
+     "title": "环向应力",
+     "input": "p=0.35 MPa，r=2.0 m，t=0.4 m，C25（ftk=1.78 MPa）",
+     "output": "σθ=0.35×2.0/0.4=1.75 MPa≈ftk → 临界，需配筋或加厚至 0.5 m（σθ=1.4 MPa）"
+    }
+   ]
+  },
+  {
+   "name": "隧洞封堵体计算",
+   "icon": "🚧",
+   "category": "工程设计",
+   "description": "计算导流隧洞封堵体的长度、抗滑与抗渗稳定，确定混凝土强度等级与接缝灌浆要求。",
+   "formula": "1) 抗滑：K=f·G/P≥1.5~2.0，P 为堵头承受的水压力 P=γw·H·A；\n2) 堵头长度：L=K·P/(f·A·γc)（矩形断面近似）；\n3) 抗渗：渗径 L≥C·H；\n4) 强度：σ=P/A≤[σ]，并按温度应力配筋；\n5) 接缝：堵头与围岩间设键槽、灌浆，接触面抗剪强度 τ=c+f·σn；\n6) 埋深要求：堵头位置围岩厚度≥1.5 倍洞径。",
+   "formula_note": "封堵体是永久挡水结构，安全等级同主要建筑物；高水头堵头宜采用楔形或设锚筋；施工期需考虑温度裂缝与灌浆压力。",
+   "variables": [
+    {
+     "key": "water_head",
+     "label": "作用水头 H",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "tunnel_area",
+     "label": "隧洞断面积 A",
+     "unit": "m²",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "concrete_density",
+     "label": "混凝土重度",
+     "unit": "kN/m³",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "friction_coeff",
+     "label": "摩擦系数 f",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "safety_factor",
+     "label": "抗滑安全系数 K",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水工隧洞设计规范》SL 279；导流洞封堵失效会造成水库无法蓄水甚至下游安全事故。",
+   "examples": [
+    {
+     "title": "堵头长度",
+     "input": "H=45 m，A=20 m²，f=0.7，K=2.0，γc=24 kN/m³",
+     "output": "P=9.81×45×20=8829 kN；L=2.0×8829/(0.7×20×24)=52.6 m（较长，可采用楔形断面或锚筋缩短）"
+    }
+   ]
+  },
+  {
+   "name": "钢管应力计算",
+   "icon": "🔧",
+   "category": "工程设计",
+   "description": "计算压力钢管在内水压力、自重、温度与支墩约束下的环向、轴向与组合应力，确定壁厚与钢材等级。",
+   "formula": "1) 环向应力：σθ=p·D/(2t)；\n2) 轴向应力：σx=p·D/(4t)+σ温+σ弯（明管）；\n3) 组合（第四强度理论）：σeq=√(σθ²−σθ·σx+σx²)≤[σ]=0.55~0.67fy；\n4) 壁厚：t=p·D/(2[σ]·φ)+c，φ 为焊缝系数 0.95，c 为锈蚀附加 1~2 mm；\n5) 外压稳定：t≥D/130+... 或设加劲环，验算抗外压屈曲；\n6) 水锤升压：按 1.3~1.5 倍工作压力校核。",
+   "formula_note": "明管轴向应力受支墩摩擦与温度影响大，宜设伸缩节；地下埋管可考虑围岩分担内压；钢材 Q345、Q390 应按厚度分组取 fy。",
+   "variables": [
+    {
+     "key": "internal_pressure",
+     "label": "设计内压（含升压）p",
+     "unit": "MPa",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "pipe_diameter",
+     "label": "钢管内径 D",
+     "unit": "mm",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "wall_thickness",
+     "label": "壁厚 t",
+     "unit": "mm",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "steel_grade",
+     "label": "钢材牌号",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "weld_factor",
+     "label": "焊缝系数 φ",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水电站压力钢管设计规范》NB/T 35056；钢管壁厚不足或水锤升压考虑不周会导致爆管。",
+   "examples": [
+    {
+     "title": "壁厚计算",
+     "input": "p=2.4 MPa，D=2500 mm，[σ]=0.6×345=207 MPa，φ=0.95，c=2 mm",
+     "output": "t=2.4×2500/(2×207×0.95)+2=15.3+2=17.3 mm，取 18 mm；σθ=2.4×2500/(2×18)=166.7 MPa ✓"
+    }
+   ]
+  },
+  {
+   "name": "钢管阴极保护计算",
+   "icon": "⚡",
+   "category": "工程设计",
+   "description": "计算埋地/水下钢管的阴极保护电流需求、阳极数量与分布，防止电化学腐蚀。",
+   "formula": "1) 保护电流：I=Σ(ic·Ai)，ic 为保护电流密度（涂层良好 0.01~0.03 mA/m²、裸管 10~30 mA/m²）；\n2) 阳极数量：N=I/(ia·η)，ia 为单支阳极输出电流，η=0.8~0.9；\n3) 阳极寿命：T=1000·W·Q/(I·8760)（年），W 为阳极重量 kg，Q 为电容量 Ah/kg（镁 1230、锌 780）；\n4) 保护电位：−0.85 V（CSE）～−1.20 V；\n5) 阳极间距：20~50 m（牺牲阳极），深井阳极用于密集区。",
+   "formula_note": "涂层质量决定电流需求，几乎全部差异来自涂层破损率；杂散电流区应加排流保护；土壤电阻率>500 Ω·m 时宜用外加电流法。",
+   "variables": [
+    {
+     "key": "pipe_area",
+     "label": "管道外表面积 A",
+     "unit": "m²",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "current_density",
+     "label": "保护电流密度 ic",
+     "unit": "mA/m²",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "anode_output",
+     "label": "单支阳极输出 ia",
+     "unit": "mA",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "coating_quality",
+     "label": "涂层状况",
+     "unit": "",
+     "required": true,
+     "remark": "良好/一般/裸管"
+    }
+   ],
+   "knowledge": "《埋地钢质管道阴极保护技术规范》GB/T 21448；阴极保护与涂层联合使用才是完整防腐方案。",
+   "examples": [
+    {
+     "title": "阳极数量",
+     "input": "A=1200 m²，ic=0.5 mA/m²，ia=50 mA，η=0.85",
+     "output": "I=600 mA；N=600/(50×0.85)=14.1 → 取 15 支，沿管每 80 m 一支"
+    }
+   ]
+  },
+  {
+   "name": "钢管抗浮计算",
+   "icon": "🔧",
+   "category": "工程设计",
+   "description": "验算地下水位以下钢管（空管或检修工况）的抗浮稳定，确定压重、锚固或排水措施。",
+   "formula": "1) 浮力：F=γw·V排（按管外径计算）；\n2) 抗浮：K=(G管+G土+G压重)/F≥1.05~1.10；\n3) 单位长度：F=γw·πD外²/4；G管=γs·π(D外²−D内²)/4；\n4) 不足时：加大覆土厚度、设混凝土压重块、锚杆（抗拔力≥差值）；\n5) 抗浮锚杆：N=(F−G)/n，锚固长度按土层摩阻力计算。",
+   "formula_note": "抗浮验算应取空管或检修放空工况，此时浮力最大；砂性土中覆土有效重度取浮重度；河道穿越段应计入冲刷后覆土损失。",
+   "variables": [
+    {
+     "key": "pipe_outer_diameter",
+     "label": "钢管外径 D外",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "pipe_wall_thickness",
+     "label": "壁厚 t",
+     "unit": "mm",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "burial_depth",
+     "label": "覆土厚度",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "groundwater_level",
+     "label": "地下水位",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《给水排水工程管道结构设计规范》GB 50332、《水电站压力钢管设计规范》NB/T 35056；空管上浮是长距离输水管道的典型事故。",
+   "examples": [
+    {
+     "title": "单位长度抗浮",
+     "input": "D外=2.0 m，t=18 mm，覆土 1.5 m（浮重度 9 kN/m³）",
+     "output": "F=9.81×π×4/4=30.8 kN/m；G管=78.5×π×(4−3.93)/4≈4.3 kN/m；G土=9×(2×1.5)×1=27 kN/m；K=(4.3+27)/30.8=1.02＜1.05 → 需设压重"
+    }
+   ]
+  },
+  {
+   "name": "钢衬钢筋混凝土管计算",
+   "icon": "🔧",
+   "category": "工程设计",
+   "description": "计算钢衬钢筋混凝土压力管道（联合受力）的钢衬厚度、混凝土开裂荷载与裂缝宽度，用于高水头引水管道。",
+   "formula": "1) 内压分担：开裂前按弹性模量比折算，钢衬承担 n=Es/Ec 比例；\n2) 混凝土开裂压力：pcr=ftk·(t_c/r + n·t_s/r)；\n3) 开裂后钢衬单独受力：σθ=p·r/t_s≤0.67fy；\n4) 裂缝宽度：wmax=αcr·ψ·σs/Es·(1.9c+0.08deq/ρte)≤0.3 mm；\n5) 钢衬厚度：t_s≥p·r/(0.67fy)，且≥8 mm（构造）；\n6) 抗外压：设加劲环，验算钢衬与混凝土联合抗外压。",
+   "formula_note": "联合受力管利用混凝土承担部分内压，但混凝土开裂后钢衬须能独立承担全部内压；钢衬与混凝土之间应设锚筋或加劲环保证共同工作；外压工况（放空）需验算钢衬屈曲。",
+   "variables": [
+    {
+     "key": "internal_pressure",
+     "label": "内水压力 p",
+     "unit": "MPa",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "pipe_radius",
+     "label": "管道内半径 r",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "steel_thickness",
+     "label": "钢衬厚度 t_s",
+     "unit": "mm",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "concrete_thickness",
+     "label": "混凝土衬厚 t_c",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "steel_grade",
+     "label": "钢材牌号",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水电站压力钢管设计规范》NB/T 35056；钢衬钢筋混凝土管兼顾防渗与刚度，广泛用于高水头引水式电站。",
+   "examples": [
+    {
+     "title": "开裂后钢衬应力",
+     "input": "p=3.0 MPa，r=2.2 m，t_s=22 mm，Q345（0.67fy=231 MPa）",
+     "output": "σθ=3.0×2200/22=300 MPa＞231 → 壁厚不足，需 t_s≥28.6 mm 或提高钢级"
+    }
+   ]
+  },
+  {
+   "name": "钢管岔管绘制",
+   "icon": "📐",
+   "category": "工程设计",
+   "description": "计算岔管（三通、月牙形、球形）的相贯线、展开图与加强梁尺寸，输出放样坐标供制作。",
+   "formula": "1) 相贯线：主管 x²+y²=R²，支管 (x−a)²+z²=r²，联立求交线参数方程；\n2) 展开：主管展开长 = 2πR，纵坐标取弧长 s=R·θ，横坐标取相贯线处 x；\n3) 支管展开按圆柱与圆柱相贯展开公式逐点计算；\n4) 加强梁：按面积补偿法 A补=A开孔·σθ/[σ]，常用 U 形梁或月牙肋；\n5) 分岔角：宜 45°~60°，过小则应力集中、过大则水头损失大；\n6) 输出各点坐标表与展开图。",
+   "formula_note": "岔管是钢管受力最复杂部位，须做三维有限元复核；月牙肋厚度按应力集中系数 1.5~2.0 取值；焊缝应做 100% 超声检测。",
+   "variables": [
+    {
+     "key": "main_diameter",
+     "label": "主管直径 D",
+     "unit": "mm",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "branch_diameter",
+     "label": "支管直径 d",
+     "unit": "mm",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "branch_angle",
+     "label": "分岔角",
+     "unit": "°",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "internal_pressure",
+     "label": "内水压力",
+     "unit": "MPa",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "wall_thickness",
+     "label": "壁厚",
+     "unit": "mm",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水电站压力钢管设计规范》NB/T 35056；岔管制作精度直接影响运行安全与水力损失。",
+   "examples": [
+    {
+     "title": "面积补偿",
+     "input": "主管 D=2000 mm、t=20 mm，支管 d=1400 mm、t=16 mm，σθ=150 MPa，[σ]=200 MPa",
+     "output": "开孔削弱面积 A=D·d=2.8 m²；补强面积 A补=2.8×150/200=2.1 m²（需环形梁或月牙肋提供）"
+    }
+   ]
+  },
+  {
+   "name": "混凝土衬砌裂缝宽度计算",
+   "icon": "📏",
+   "category": "工程设计",
+   "description": "按规范公式计算钢筋混凝土衬砌在荷载作用下的最大裂缝宽度，控制结构耐久性与防渗性能。",
+   "formula": "1) wmax=αcr·ψ·σs/Es·(1.9c+0.08deq/ρte)；\n2) σs=Mk/(0.87·h0·As)；\n3) ψ=1.1−0.65ftk/(ρte·σs)，ψ<0.2 取 0.2、>1.0 取 1.0；\n4) ρte=As/(0.5bh)，<0.01 时取 0.01；\n5) deq=Σ(ni·di²)/Σ(ni·di)；\n6) 限值：0.25 mm（一般）、0.20 mm（有防渗要求）、0.30 mm（干燥环境）。",
+   "formula_note": "水工衬砌通常要求 wmax≤0.25 mm 且不允许贯通裂缝；温度收缩裂缝应按构造配筋（配筋率≥0.2%）控制；内水压力大的构件宜按抗裂设计。",
+   "variables": [
+    {
+     "key": "moment",
+     "label": "标准组合弯矩 Mk",
+     "unit": "kN·m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "section",
+     "label": "截面 b×h",
+     "unit": "mm",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "rebar_area",
+     "label": "受拉钢筋面积 As",
+     "unit": "mm²",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "concrete_grade",
+     "label": "混凝土强度等级",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "cover",
+     "label": "保护层厚度 c",
+     "unit": "mm",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水工混凝土结构设计规范》SL 191；裂缝宽度是衬砌防渗与耐久性的控制指标。",
+   "examples": [
+    {
+     "title": "裂缝宽度估算",
+     "input": "Mk=95 kN·m，b=1000、h=500，As=1520 mm²，h0=450 mm，Es=2×10⁵ MPa",
+     "output": "σs=95×10⁶/(0.87×450×1520)=159.6 MPa；ρte=0.00304→取 0.01；wmax≈2.1×0.6×159.6/2e5×(1.9×40+0.08×16/0.01)=0.20 mm（满足 0.25）"
+    }
+   ]
+  },
+  {
+   "name": "沉井设计计算",
+   "icon": "🕳️",
+   "category": "工程设计",
+   "description": "计算沉井的下沉系数、抗浮系数、刃脚与井壁强度，确定分节高度、壁厚与封底混凝土厚度。",
+   "formula": "1) 下沉系数：K1=(G−F浮)/(T+R)，T 为井壁摩阻力 T=Σf·h·u，R 为刃脚踏面阻力；要求 K1≥1.15~1.25；\n2) 抗浮：K2=G/F浮≥1.05（施工期）、1.10（使用期）；\n3) 井壁厚：t≥(0.05~0.10)D，常用 0.5~1.0 m；\n4) 刃脚：按悬臂梁验算，根部弯矩 M=0.5·q·h²；\n5) 封底：t≥(0.6~1.0)B，按抗浮与抗渗验算；\n6) 下沉困难时：射水助沉、触变泥浆套、加配重。",
+   "formula_note": "摩阻力 f：砂土 15~25 kPa、粘土 12~20 kPa；下沉系数过大易突沉，过小则沉不下去；临近建筑物时应控制沉降与降水。",
+   "variables": [
+    {
+     "key": "well_weight",
+     "label": "沉井自重 G",
+     "unit": "kN",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "buoyancy",
+     "label": "浮力 F浮",
+     "unit": "kN",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "friction",
+     "label": "井壁摩阻力 T",
+     "unit": "kN",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "cutting_resistance",
+     "label": "刃脚踏面阻力 R",
+     "unit": "kN",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "well_diameter",
+     "label": "沉井外径 D",
+     "unit": "m",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《给水排水工程构筑物结构设计规范》GB 50069、《沉井设计与施工规程》；下沉系数与抗浮系数是沉井设计的两项核心指标。",
+   "examples": [
+    {
+     "title": "下沉系数",
+     "input": "G=8600 kN，F浮=3200 kN，井壁摩阻 T=3600 kN，刃脚阻力 R=520 kN",
+     "output": "K1=(8600−3200)/(3600+520)=1.31≥1.15 ✓（偏大，宜设触变泥浆控制下沉速度）"
+    }
+   ]
+  },
+  {
+   "name": "钢闸门结构计算",
+   "icon": "🚪",
+   "category": "工程设计",
+   "description": "计算平面钢闸门的面板、主梁、次梁与边梁在水压力下的强度、刚度与稳定性，确定型钢规格。",
+   "formula": "1) 面板厚度：t≥b·√(p/(2[σ]))，b 为区格短边，最小 6 mm；\n2) 主梁荷载：q=p·l（l 为梁间距），M=qL²/8，σ=M/W≤[σ]；\n3) 挠度：f=5qL⁴/(384EI)≤L/750；\n4) 次梁按构造取 [ 12~[ 20；\n5) 整体稳定：按《钢结构设计标准》验算主梁侧向稳定与面板参与受力；\n6) 止水与埋件：底止水预压 2~3 mm。",
+   "formula_note": "水压力按设计水位（含浪高）计算，取最不利工况；主梁宜用 Q355 焊接工字梁；高水头闸门应做空间有限元分析；腐蚀环境钢材厚度附加 1~2 mm。",
+   "variables": [
+    {
+     "key": "water_head",
+     "label": "设计水头",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "gate_width",
+     "label": "闸门宽度",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "gate_height",
+     "label": "闸门高度",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "beam_spacing",
+     "label": "主梁间距",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "steel_grade",
+     "label": "钢材牌号",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水利水电工程钢闸门设计规范》SL 74；闸门结构不足会导致门叶变形、止水失效甚至失稳。",
+   "examples": [
+    {
+     "title": "面板厚度",
+     "input": "区格短边 b=0.6 m，设计水头 4 m（p=39.2 kPa），[σ]=160 MPa",
+     "output": "t≥0.6×√(39200/(2×160×10⁶))... 按 mm 计：t≥b√(p/(2[σ]))=600×√(0.0392/320)=6.6 mm，取 8 mm"
+    }
+   ]
+  },
+  {
+   "name": "平面闸门动水启闭力计算",
+   "icon": "🔧",
+   "category": "工程设计",
+   "description": "计算平面闸门在动水条件下的启门力、闭门力与持住力，确定启闭机容量与门槽型式。",
+   "formula": "1) 启门力：T启=K·(G+W+P水+P摩)+P上托，K=1.1~1.2；\n2) P水=γw·h·B·t门（门顶水柱压力，动水时按闸门前后水位差）；\n3) P摩=f·(P水侧+γw·h·B·... )，f 取 0.3（滑块）、0.1（滚轮）；\n4) 闭门力：T闭=K·(G+P摩)−P水−P上托，负值表示需加重；\n5) 持住力：T持=G+P摩；\n6) 启闭机容量取 T启 的 1.1 倍，并校核吊杆强度。",
+   "formula_note": "动水启闭的摩阻力远大于静水，SL 74 规定动水启闭的门槽需设反轨与导向；上托力按淹没深度与流速计算；事故闸门应能在动水中关闭。",
+   "variables": [
+    {
+     "key": "gate_weight",
+     "label": "门叶自重 G",
+     "unit": "kN",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "water_head",
+     "label": "水头差",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "gate_width",
+     "label": "门宽 B",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "seal_friction",
+     "label": "摩擦系数 f",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "hoist_type",
+     "label": "启闭机型式",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水利水电工程钢闸门设计规范》SL 74；启闭力计算偏小会造成启门失败、汛期无法开闸。",
+   "examples": [
+    {
+     "title": "启门力",
+     "input": "G=120 kN，水头差 3 m，B=4 m，f=0.3，门高 3 m，K=1.15",
+     "output": "P水=9.81×3×4×3/2≈176.6 kN；P摩=0.3×176.6=53 kN；T启=1.15×(120+176.6+53)=402 kN → 选 2×250 kN 启闭机"
+    }
+   ]
+  },
+  {
+   "name": "复合地基计算",
+   "icon": "🏗️",
+   "category": "工程设计",
+   "description": "计算水泥土搅拌桩、CFG 桩等复合地基的承载力特征值与面积置换率，校核是否满足设计承载力要求。",
+   "formula": "1) 单桩承载力特征值：Ra=up·Σ(qsi·li)+αp·qp·Ap；\n2) 复合地基承载力：fspk=λ·m·Ra/Ap+β·(1−m)·fsk；\n3) 面积置换率：m=Ra/(fspk−β·fsk+λ·Ra/Ap) 反算，或 m=d²/de²；\n4) 正方形布桩 de=1.13s，三角形 de=1.05s；\n5) 校核：fspk≥fak 设计要求；λ=0.8~1.0、β=0.75~1.0；\n6) 沉降按复合模量法计算，Esp=m·Ep+(1−m)·Es。",
+   "formula_note": "λ、β 取值与桩型、土性有关，须按 JGJ 79 表取值，不能一律取 1.0；桩端应进入较好持力层≥0.5 m；置换率过高不经济，宜 0.05~0.15。",
+   "variables": [
+    {
+     "key": "pile_perimeter",
+     "label": "桩周长 up",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "side_friction",
+     "label": "各层侧阻力 qsi 与厚度 li",
+     "unit": "kPa, m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "end_resistance",
+     "label": "桩端阻力 qp",
+     "unit": "kPa",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "pile_area",
+     "label": "桩截面积 Ap",
+     "unit": "m²",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "soil_capacity",
+     "label": "桩间土承载力 fsk",
+     "unit": "kPa",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "target_capacity",
+     "label": "设计承载力 fspk",
+     "unit": "kPa",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《建筑地基处理技术规范》JGJ 79、《复合地基技术规范》GB/T 50783；复合地基是软基处理最常用方案，置换率与桩长是造价主控参数。",
+   "examples": [
+    {
+     "title": "CFG 桩复合地基",
+     "input": "up=1.413 m，Σqsi·li=1.1×35+4.4×50+2×65=388.5 kN/m，qp=1500 kPa，Ap=0.159 m²，λ=0.9，β=1.0，fsk=180 kPa",
+     "output": "Ra=1.413×388.5+0.159×1500=787.4 kN；若 m=0.08，fspk=0.9×0.08×787.4/0.159+1.0×0.92×180=356.5+165.6=522 kPa"
+    }
+   ]
+  },
+  {
+   "name": "复合地基设计计算",
+   "icon": "📐",
+   "category": "工程设计",
+   "description": "由设计承载力反算复合地基的桩径、桩长、桩距与布桩数量，输出布桩图参数。",
+   "formula": "1) 由 fspk 反算置换率：m=(fspk−β·fsk)/(λ·Ra/Ap−β·fsk)；\n2) 桩距：正方形 s=√(Ap/m)，三角形 s=√(2Ap/(√3·m))；\n3) 桩数：n=m·A/Ap（A 为基础面积）；\n4) 桩长：按承载力与沉降双控，取 Ra 计算所需长度与沉降控制长度的较大值；\n5) 校核：fspk实际≥fspk设计，沉降≤允许值；\n6) 输出：桩径、桩距、桩长、桩数、置换率。",
+   "formula_note": "桩距宜 3~5 倍桩径，过密会扰动桩间土；桩长应穿透软弱层进入持力层；大面积处理应分组试桩验证。",
+   "variables": [
+    {
+     "key": "target_capacity",
+     "label": "设计承载力 fspk",
+     "unit": "kPa",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "single_pile_capacity",
+     "label": "单桩承载力 Ra",
+     "unit": "kN",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "pile_area",
+     "label": "桩截面积 Ap",
+     "unit": "m²",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "soil_capacity",
+     "label": "桩间土 fsk",
+     "unit": "kPa",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "foundation_area",
+     "label": "处理面积 A",
+     "unit": "m²",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《建筑地基处理技术规范》JGJ 79；设计计算的准确性直接影响地基处理造价与工后沉降。",
+   "examples": [
+    {
+     "title": "反算置换率与桩距",
+     "input": "fspk=500 kPa，β·fsk=180，λ·Ra/Ap=0.9×787/0.159=4455 kPa",
+     "output": "m=(500−180)/(4455−180)=0.0749；D=0.45 m 时 Ap=0.159，正方形 s=√(0.159/0.0749)=1.46 m"
+    }
+   ]
+  },
+  {
+   "name": "排水固结法计算",
+   "icon": "💧",
+   "category": "工程设计",
+   "description": "计算砂井/塑料排水板地基的固结度与沉降随时间发展，确定预压荷载、排水板间距与预压期。",
+   "formula": "1) 竖向固结度：Uv=1−8/π²·exp(−π²·Tv/4)，Tv=Cv·t/H²；\n2) 径向固结度（砂井）：Ur=1−exp(−8·Th/F(n))，Th=Ch·t/de²，F(n)=n²/(n²−1)·ln(n)−(3n²−1)/(4n²)；\n3) 共同作用：U=1−(1−Uv)(1−Ur)；\n4) 沉降：St=U·S∞，S∞ 由 e-p 曲线分层计算；\n5) 设计：要求 U≥0.80（一般）、0.90（重要），反算预压时间 t。",
+   "formula_note": "排水板间距常用 1.0~1.5 m（正方形），深宽比 n=de/dw 取 15~25；涂抹与井阻效应使实际固结度低于理论值，宜乘 0.8~0.9 折减；预压荷载应大于设计荷载 20%。",
+   "variables": [
+    {
+     "key": "consolidation_coeff",
+     "label": "竖向固结系数 Cv",
+     "unit": "cm²/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "radial_coeff",
+     "label": "径向固结系数 Ch",
+     "unit": "cm²/s",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "drain_spacing",
+     "label": "排水体间距",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "drain_depth",
+     "label": "排水体深度",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "surcharge",
+     "label": "预压荷载",
+     "unit": "kPa",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "drainage_time",
+     "label": "预压时间",
+     "unit": "d",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《建筑地基处理技术规范》JGJ 79；排水固结法适用于深厚软黏土，工期与固结度直接相关。",
+   "examples": [
+    {
+     "title": "竖向固结度",
+     "input": "Cv=2.0×10⁻³ cm²/s，H=8 m（单面排水），t=180 d",
+     "output": "Tv=2.0e-3×180×86400/(800²)=0.0486；Uv=1−0.811×exp(−0.12)=1−0.719=28.1%（需配合排水板提高）"
+    }
+   ]
+  },
+  {
+   "name": "基坑设计计算",
+   "icon": "🕳️",
+   "category": "工程设计",
+   "description": "计算基坑支护结构的土压力、嵌固深度与稳定性（抗倾覆、抗隆起、整体稳定），确定支护方案。",
+   "formula": "1) 主动/被动土压力：Ea=0.5γH²Ka−2cH√Ka，Ep=0.5γH²Kp+2cH√Kp；\n2) 嵌固深度：由抗倾覆 K=Ep·hp/(Ea·ha)≥1.2 反算；\n3) 抗隆起：Kb=γ·D·Nq+c·Nc/(γ·(H+D)+q)≥1.2；\n4) 整体稳定：圆弧滑动 Fs≥1.3；\n5) 支护结构内力：按弹性支点法或有限元，M、V 用于配筋；\n6) 变形：墙顶水平位移≤0.2%H 且≤30 mm。",
+   "formula_note": "深基坑（H>5 m）须做专项设计并专家论证；地下水控制（降水/止水帷幕）与支护同等重要；临近建筑物时应按变形控制设计。",
+   "variables": [
+    {
+     "key": "excavation_depth",
+     "label": "基坑深度 H",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "soil_props",
+     "label": "各层土 γ、c、φ",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "surcharge",
+     "label": "地面超载 q",
+     "unit": "kPa",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "embedment_depth",
+     "label": "嵌固深度 D",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "groundwater",
+     "label": "地下水位",
+     "unit": "m",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《建筑基坑支护技术规程》JGJ 120、《建筑边坡工程技术规范》GB 50330；基坑事故多因超挖、降水不当或支护嵌固不足。",
+   "examples": [
+    {
+     "title": "抗倾覆校核",
+     "input": "Ea=420 kN/m（力臂 2.5 m），Ep=280 kN/m（力臂 1.8 m）",
+     "output": "K=280×1.8/(420×2.5)=0.48＜1.2 → 嵌固深度不足，需加深或增设内支撑"
+    }
+   ]
+  },
+  {
+   "name": "不考虑负摩阻力的单桩竖向极限承载力计算",
+   "icon": "🔩",
+   "category": "工程设计",
+   "description": "按规范公式估算单桩竖向极限承载力标准值（不计负摩阻力），用于初步设计与桩型比选。",
+   "formula": "1) 极限标准值：Quk=Qsk+Qpk=u·Σ(qsik·li)+qpk·Ap；\n2) 特征值：Ra=Quk/2；\n3) 大直径端承桩：Ra=qpa·Ap（嵌岩段）；\n4) 桩身强度：N≤φ·fc·Ap（φ 取 0.6~0.9）；\n5) 校核：Ra≥设计单桩荷载；\n6) 负摩阻力（本卡不计）：存在欠固结土、地面堆载时须另计 Qn，N≤Ra−Qn。",
+   "formula_note": "qsik、qpk 应由当地静载试验统计或查规范表，地区差异大；桩端进入持力层深度影响 qpk 发挥；施工工艺（钻孔/打入）影响系数不同。",
+   "variables": [
+    {
+     "key": "pile_perimeter",
+     "label": "桩周长 u",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "side_resistance",
+     "label": "各层极限侧阻力 qsik 与厚度 li",
+     "unit": "kPa, m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "end_resistance",
+     "label": "极限端阻力 qpk",
+     "unit": "kPa",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "pile_area",
+     "label": "桩端面积 Ap",
+     "unit": "m²",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "concrete_grade",
+     "label": "桩身混凝土强度",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《建筑地基基础设计规范》GB 50007 第 8.5.6 条、《建筑桩基技术规范》JGJ 94；初步设计估算与施工图阶段静载试验应相互校核。",
+   "examples": [
+    {
+     "title": "钻孔灌注桩",
+     "input": "u=1.885 m（D=0.6），Σqsik·li=1.2×45+6×38+3×55=447 kN/m，qpk=900 kPa，Ap=0.283 m²",
+     "output": "Quk=1.885×447+900×0.283=842.6+254.7=1097 kN；Ra=549 kN"
+    }
+   ]
+  },
+  {
+   "name": "灌注桩单桩水平承载力计算",
+   "icon": "🔩",
+   "category": "工程设计",
+   "description": "按 m 法计算灌注桩在水平荷载下的桩身内力与桩顶位移，确定单桩水平承载力特征值。",
+   "formula": "1) 桩土变形系数：α=(m·b0/(EI))^(1/5)，m 为地基水平抗力比例系数；\n2) 桩顶位移：x0=H/(α³EI)·νx（νx 查表，与 αh 有关）；\n3) 特征值：Rha=0.75·α³·EI·x0a/νx，x0a 为允许位移（一般 10 mm）；\n4) 桩身弯矩：Mmax=H/α·νm（νm 查表）；\n5) 配筋按 Mmax 计算，裂缝宽度≤0.2 mm；\n6) 校核：Hk≤Rha。",
+   "formula_note": "m 值：淤泥 2~4、黏土 6~15、砂 15~40 MN/m⁴；αh>4 时为柔性桩、<2.5 为刚性桩，公式适用柔性桩；水平承载力宜由水平静载试验验证。",
+   "variables": [
+    {
+     "key": "horizontal_load",
+     "label": "水平荷载 H",
+     "unit": "kN",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "pile_diameter",
+     "label": "桩径 d",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "pile_length",
+     "label": "桩长 h",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "soil_m",
+     "label": "地基比例系数 m",
+     "unit": "MN/m⁴",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "elastic_modulus",
+     "label": "桩身弹性模量 Ec",
+     "unit": "MPa",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《建筑桩基技术规范》JGJ 94；水平承载力常控制海上风电、码头与挡墙基础桩的桩径与配筋。",
+   "examples": [
+    {
+     "title": "变形系数",
+     "input": "d=1.0 m，Ec=3.0×10⁴ MPa，m=10 MN/m⁴，b0=1.8 m",
+     "output": "EI=3.0e7×0.0491=1.47e6 kN·m²；α=(10×1.8/1.47e6)^(1/5)=0.28 m⁻¹；αh=0.28×20=5.6（柔性桩）"
+    }
+   ]
+  },
+  {
+   "name": "堤身沉降计算",
+   "icon": "📉",
+   "category": "工程设计",
+   "description": "计算堤防填筑引起的地基最终沉降与工后沉降，确定预留超高与填筑速率。",
+   "formula": "1) 分层总和法：S=Σ[(e1i−e2i)/(1+e1i)]·hi（e-p 曲线）；\n2) 或 S=Σ(Δσi/Esi)·hi（压缩模量法）；\n3) 附加应力：Δσ 按梯形/条形荷载布辛奈斯克解或简化扩散法；\n4) 工后沉降：S工后=S∞−St（t 为竣工时）；要求≤0.1~0.3 m（按堤防等级）；\n5) 填筑速率控制：地基固结度≥0.8 或沉降速率≤10~15 mm/d；\n6) 预留超高：Δh=S工后。",
+   "formula_note": "计算深度取附加应力≤0.2 倍自重应力处；软土厚度大时应考虑次固结；重要堤防应埋设沉降观测点实测反演参数。",
+   "variables": [
+    {
+     "key": "layer_thickness",
+     "label": "各压缩层厚度 hi",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "void_ratio",
+     "label": "各层 e1、e2",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "compression_modulus",
+     "label": "压缩模量 Es",
+     "unit": "MPa",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "fill_height",
+     "label": "填筑高度",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "embankment_grade",
+     "label": "堤防等级",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《堤防工程设计规范》GB 50286；沉降计算不足会导致堤顶高程不够、堤身开裂。",
+   "examples": [
+    {
+     "title": "分层沉降",
+     "input": "两层：h1=3 m、e1=0.92→e2=0.85；h2=4 m、e1=0.78→e2=0.74",
+     "output": "S1=(0.07/1.92)×3=0.109 m；S2=(0.04/1.78)×4=0.090 m；S=0.199 m ≈ 0.20 m"
+    }
+   ]
+  },
+  {
+   "name": "土石坝及面板堆石坝沉降计算",
+   "icon": "🏔️",
+   "category": "工程设计",
+   "description": "计算土石坝坝体与坝基的施工期沉降、运行期沉降，用于确定坝顶预留超高与面板接缝设计。",
+   "formula": "1) 坝基：S基=Σ(e1−e2)/(1+e1)·h；\n2) 坝体：S体=Σ(Δσ/Ei)·hi，Ei 取坝料压缩模量（碾压堆石 40~80 MPa、心墙料 10~30 MPa）；\n3) 经验估算：S=K·H^1.5（K=0.003~0.008，H 为坝高）；\n4) 面板堆石坝：竣工后沉降≤0.1%~0.3%H，差异沉降控制面板接缝；\n5) 预留超高：Δh=(0.3%~0.5%)H；\n6) 观测：坝体内部沉降管、表面变形标点。",
+   "formula_note": "堆石体流变会引起长期沉降，高坝（>100 m）应做流变计算；面板坝沉降过大会导致面板脱空、挤压破坏；填筑速率影响沉降发展。",
+   "variables": [
+    {
+     "key": "dam_height",
+     "label": "坝高 H",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "layer_modulus",
+     "label": "各层压缩模量 Ei",
+     "unit": "MPa",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "layer_thickness",
+     "label": "分层厚度",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "dam_type",
+     "label": "坝型",
+     "unit": "",
+     "required": true,
+     "remark": "土坝/面板堆石坝"
+    }
+   ],
+   "knowledge": "《碾压式土石坝设计规范》SL 274、《混凝土面板堆石坝设计规范》SL 228；沉降控制不足会造成坝顶凹陷、防浪墙开裂。",
+   "examples": [
+    {
+     "title": "经验估算",
+     "input": "H=60 m，K=0.005",
+     "output": "S=0.005×60^1.5=0.005×464.8=2.32 m（预留超高取 0.4%H=0.24 m 应结合分层计算确定）"
+    }
+   ]
+  },
+  {
+   "name": "下游贴坡排水计算",
+   "icon": "💧",
+   "category": "工程设计",
+   "description": "确定土石坝下游贴坡式排水的厚度、高度与反滤层，防止渗流出逸破坏与坝坡冻胀。",
+   "formula": "1) 排水体高度：Hb=a0+0.5 m（a0 为浸润线出逸高度）；\n2) 厚度：t≥0.3 m（干砌石）、≥0.4 m（堆石），并按冻深加厚（t≥冻深+0.2 m）；\n3) 反滤层：砂 0.15 m + 砾 0.20 m，满足 D15/d85≤4~5；\n4) 顶部应高出浸润线出逸点 0.5 m，底部伸入坝脚排水棱体；\n5) 排水能力：q排≥q渗（单宽渗流量）；\n6) 坡脚设排水沟，纵坡≥0.005。",
+   "formula_note": "贴坡排水不能降低浸润线，仅保护出逸段，浸润线过高时应改用棱体或褥垫排水；反滤层级配必须严格，否则会淤堵失效。",
+   "variables": [
+    {
+     "key": "seepage_exit_height",
+     "label": "浸润线出逸高度 a0",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "frost_depth",
+     "label": "冻深",
+     "unit": "m",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "seepage_flow",
+     "label": "单宽渗流量 q",
+     "unit": "m³/(s·m)",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "slope_ratio",
+     "label": "坝坡坡比",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《碾压式土石坝设计规范》SL 274；贴坡排水是最经济的护坡排水形式，但适用条件有限。",
+   "examples": [
+    {
+     "title": "排水高度",
+     "input": "a0=1.8 m，冻深 0.9 m",
+     "output": "Hb=1.8+0.5=2.3 m；厚度取 max(0.4, 0.9+0.2)=1.1 m（冻胀控制）"
+    }
+   ]
+  },
+  {
+   "name": "水力机械设计计算",
+   "icon": "⚙️",
+   "category": "工程设计",
+   "description": "计算水轮机出力、流量与吸出高度，确定机型、装机容量与转轮直径，用于小型水电站与泵站选型。",
+   "formula": "1) 出力：N=9.81·Q·H·η，η 为机组效率（小型 0.80~0.88）；\n2) 设计流量：Q=N/(9.81·H·η)；\n3) 转轮直径：D1=√(Q/(Q11·√H))（Q11 为单位流量）；\n4) 转速：n=n11·√H/D1；\n5) 吸出高度：Hs=10−∇/900−(σ+Δσ)·H，要求 Hs≥−4 m（避免空化）；\n6) 装机：N装≥Nmax/0.95，台数 2~4 台。",
+   "formula_note": "水头变化大的电站应做运行特性校核，避免长期低效区运行；吸出高度不足会发生空蚀，高海拔需修正大气压；小型机组效率取值应保守。",
+   "variables": [
+    {
+     "key": "flow",
+     "label": "设计流量 Q",
+     "unit": "m³/s",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "head",
+     "label": "设计水头 H",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "efficiency",
+     "label": "机组效率 η",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "rated_speed",
+     "label": "比转速 ns",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "elevation",
+     "label": "电站海拔",
+     "unit": "m",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《小型水力发电站设计规范》GB 50071、《水力机械设计手册》；机型选择直接影响发电量与投资。",
+   "examples": [
+    {
+     "title": "出力计算",
+     "input": "Q=2.4 m³/s，H=28 m，η=0.85",
+     "output": "N=9.81×2.4×28×0.85=560 kW → 选 2×320 kW 机组"
+    }
+   ]
+  },
+  {
+   "name": "柴油发电机组容量计算程序",
+   "icon": "🔌",
+   "category": "工程设计",
+   "description": "按用电负荷与启动条件计算备用/应急柴油发电机组的容量，校核电动机启动时的电压降与过载能力。",
+   "formula": "1) 计算负荷：Pjs=K·ΣPe（需要系数 K=0.7~0.9）；\n2) 视在功率：S=Pjs/cosφ，cosφ=0.8；\n3) 发电机组容量：Sg≥1.25·S（考虑效率与裕度）；\n4) 电动机启动校核：Sg≥Sq/(Kq·ΔU)，Sq 为启动容量，ΔU 允许 15%~20%；\n5) 最大单台电动机容量不宜超过机组容量的 30%（直接启动）；\n6) 校核：Sg≥S消防/应急负荷。",
+   "formula_note": "消防负荷应单独统计并取最大同时使用；非线性负荷（UPS、变频器）会增大机组容量 20%~30%；海拔>1000 m、环境温度>40 ℃ 需降容修正。",
+   "variables": [
+    {
+     "key": "load_list",
+     "label": "用电设备清单与功率",
+     "unit": "kW",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "demand_factor",
+     "label": "需要系数 K",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "power_factor",
+     "label": "功率因数 cosφ",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "starting_load",
+     "label": "最大电动机启动容量",
+     "unit": "kVA",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《民用建筑电气设计标准》GB 51348、《水力发电厂厂用电设计规范》；机组容量不足会导致启动失败、频率崩溃。",
+   "examples": [
+    {
+     "title": "容量估算",
+     "input": "ΣPe=180 kW，K=0.8，cosφ=0.8",
+     "output": "Pjs=144 kW；S=180 kVA；Sg≥1.25×180=225 kVA → 选 250 kVA 机组"
+    }
+   ]
+  },
+  {
+   "name": "柴油发电机的选择计算",
+   "icon": "🔧",
+   "category": "工程设计",
+   "description": "在容量计算基础上选择柴油发电机的型号、台数、冷却方式与燃油储备，输出选型表。",
+   "formula": "1) 容量匹配：0.8·Pn≤Sjs≤1.0·Pn（长期运行）；\n2) 台数：n=Sjs/(0.8·Pn单)，取整并考虑 N+1 备用；\n3) 燃油储备：V=ge·Pn·t·k/1000/ρ，ge 取 210~230 g/kWh；\n4) 冷却：风冷≤200 kW、水冷>200 kW；\n5) 机房：通风量≥燃烧空气量+散热风量，进排风面积按 0.01 m²/kW；\n6) 排烟：背压≤5 kPa，管长≤10 m。",
+   "formula_note": "长期低负荷（<30%）运行会积碳，应避免；并机运行时需同型号、同转向；高原地区功率按每 300 m 降 3%~4% 修正。",
+   "variables": [
+    {
+     "key": "calculated_load",
+     "label": "计算负荷 Sjs",
+     "unit": "kVA",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "unit_capacity",
+     "label": "单机容量 Pn",
+     "unit": "kW",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "fuel_rate",
+     "label": "燃油消耗率 ge",
+     "unit": "g/kWh",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "runtime",
+     "label": "连续运行时间 t",
+     "unit": "h",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《供配电系统设计规范》GB 50052、《柴油发电机组》GB/T 2820；选型需兼顾容量、备用率与经济性。",
+   "examples": [
+    {
+     "title": "台数与油储",
+     "input": "Sjs=520 kVA，单机 300 kW（cosφ=0.8 → 375 kVA），ge=220 g/kWh，t=8 h",
+     "output": "n=520/(0.8×375)=1.73 → 2 台；燃油 V=220×300×8×2/1000/0.84=1257 L ≈ 1.3 m³"
+    }
+   ]
+  },
+  {
+   "name": "施工用电量计算",
+   "icon": "⚡",
+   "category": "工程设计",
+   "description": "按需要系数法计算施工总用电负荷，确定变压器容量、配电线路与临时电源方案。",
+   "formula": "1) 总视在功率：S=1.05~1.10×(K1·ΣP1/cosφ+K2·ΣP2+K3·ΣP3+K4·ΣP4)；\n2) 系数：电动机 K1=0.5~0.7、cosφ=0.75；电焊机 K2=0.5；室内照明 K3=0.8；室外照明 K4=1.0；\n3) 变压器容量：Sb≥S，并按 70%~85% 负载率选型；\n4) 导线截面：按允许载流量与电压降（≤5%）双控；\n5) 校核：最大电动机启动时母线电压降≤10%。",
+   "formula_note": "施工用电高峰应按主体工程施工期统计；降水、拌和、起重设备是主要负荷；临时线路应考虑风荷载与机械碰撞防护。",
+   "variables": [
+    {
+     "key": "motor_power",
+     "label": "电动机总功率 ΣP1",
+     "unit": "kW",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "welder_power",
+     "label": "电焊机总容量 ΣP2",
+     "unit": "kVA",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "lighting_power",
+     "label": "照明总功率 ΣP3+ΣP4",
+     "unit": "kW",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "demand_coeff",
+     "label": "需要系数",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《建设工程施工现场供用电安全规范》GB 50194、《水利水电工程施工组织设计规范》SL 303；用电负荷计算是临建规模与供电方案的基础。",
+   "examples": [
+    {
+     "title": "变压器容量",
+     "input": "ΣP1=420 kW（K1=0.6，cosφ=0.75），ΣP2=120 kVA（K2=0.5），照明 30 kW（K=0.8）",
+     "output": "S=1.05×(0.6×420/0.75+0.5×120+0.8×30)=1.05×(336+60+24)=441 kVA → 选 500 kVA 变压器"
+    }
+   ]
+  },
+  {
+   "name": "施工用风量计算",
+   "icon": "💨",
+   "category": "工程设计",
+   "description": "计算风钻、喷混凝土、清仓等施工用风设备的耗风量与管网压力损失，确定空压机容量与管径。",
+   "formula": "1) 总耗风量：Q=Σ(ni·qi·Ki)·K漏·K高，K漏=1.1~1.15、K高=1.1（高原）；\n2) 同时使用系数 Ki：风钻 0.8~0.9、喷混凝土 0.7、清扫 0.6；\n3) 管网压力损失：Δp=λ(L/d)(ρv²/2)，要求末端压力≥0.5~0.6 MPa；\n4) 管径：d=√(4Q/(πv))，v 取 10~15 m/s；\n5) 空压机容量：Q机≥1.15Q，台数 N+1 备用。",
+   "formula_note": "风钻耗风量：YT28 约 3.5~4.0 m³/min；长管道应每 500 m 设油水分离器；高原地区空压机按海拔修正排风量。",
+   "variables": [
+    {
+     "key": "equipment_list",
+     "label": "用风设备数量与单台耗风量",
+     "unit": "台, m³/min",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "simultaneous_factor",
+     "label": "同时使用系数",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "pipe_length",
+     "label": "管路长度",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "working_pressure",
+     "label": "末端工作压力",
+     "unit": "MPa",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水利水电工程施工组织设计规范》SL 303；供风系统能力不足会直接降低钻爆与喷锚施工效率。",
+   "examples": [
+    {
+     "title": "空压机容量",
+     "input": "8 台风钻，单台 3.8 m³/min，K=0.85；2 台喷混凝土机，单台 9 m³/min，K=0.7",
+     "output": "Q=(8×3.8×0.85+2×9×0.7)×1.15=(25.8+12.6)×1.15=44.2 m³/min → 选 3 台 20 m³/min（含 1 台备用）"
+    }
+   ]
+  },
+  {
+   "name": "土石方平衡计算",
+   "icon": "🚛",
+   "category": "工程设计",
+   "description": "统计挖方、填方、利用方与弃方，计算调配运距与弃渣场容量，编制土石方平衡表。",
+   "formula": "1) 自然方与压实方换算：V压实=V自然·K压实（土方 0.85~0.95、石方 0.75~0.85）；\n2) 平衡：ΣV挖=ΣV填/K+ΣV弃−ΣV借；\n3) 弃方：V弃=V挖−V利用；借方：V借=V填/K−V利用；\n4) 运距：加权平均 L=Σ(Vi·Li)/ΣVi；\n5) 弃渣场容量：V场≥1.1×V弃（松方系数 1.2~1.3）；\n6) 经济运距：L经济=(C装+C卸)/(2·c·km)。",
+   "formula_note": "土石方平衡应分部位、分时段统计，避免二次倒运；利用方需满足填筑料质量要求；弃渣场须做水保与稳定设计。",
+   "variables": [
+    {
+     "key": "excavation",
+     "label": "挖方量（自然方）",
+     "unit": "m³",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "fill",
+     "label": "填方量（压实方）",
+     "unit": "m³",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "compaction_factor",
+     "label": "压实系数 K",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "utilization",
+     "label": "可利用方量",
+     "unit": "m³",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "haul_distance",
+     "label": "各调配运距",
+     "unit": "km",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水利水电工程施工组织设计规范》SL 303、《水土保持综合治理技术规范》；土石方平衡是造价与水保方案的核心内容。",
+   "examples": [
+    {
+     "title": "弃方计算",
+     "input": "挖方 52 万m³，填方 38 万m³（压实），K=0.9，利用 42 万m³",
+     "output": "填方需自然方 38/0.9=42.2 万m³；弃方=52−42=10 万m³；需借方 42.2−42=0.2 万m³"
+    }
+   ]
+  },
+  {
+   "name": "施工工期计算",
+   "icon": "📅",
+   "category": "工程设计",
+   "description": "按关键线路法计算工程施工总工期、各阶段控制性节点与高峰强度，用于施工组织设计。",
+   "formula": "1) 网络计划：ESj=max(ESi+Di)，总工期 T=关键线路各工序历时之和；\n2) 工序历时：D=Q/(n·q·K)，Q 为工程量、n 为设备数、q 为台班产量、K 为时间利用系数；\n3) 高峰强度：I=Qmax/月数，校核设备与人员配置；\n4) 非关键工序时差：TF=LS−ES，FF=EF−ES；\n5) 工期压缩：优先压缩关键线路上费用率最低的工序；\n6) 输出：总工期、控制节点（截流、下闸蓄水、首台机组发电）。",
+   "formula_note": "土石坝填筑受雨季与有效工日影响，应按年有效施工天数折算；混凝土浇筑受温控限制；工期压缩不得违反规范规定的养护与沉降期要求。",
+   "variables": [
+    {
+     "key": "work_items",
+     "label": "各工序工程量与产量",
+     "unit": "",
+     "required": true,
+     "remark": "Q、q、n"
+    },
+    {
+     "key": "working_days",
+     "label": "年有效施工天数",
+     "unit": "d",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "start_date",
+     "label": "开工日期",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "milestones",
+     "label": "控制性节点",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水利水电工程施工组织设计规范》SL 303；工期与导流、度汛方案强耦合，是项目策划的主线。",
+   "examples": [
+    {
+     "title": "填筑工期",
+     "input": "填筑量 86 万m³，月强度 8 万m³，有效月 10 个月/年",
+     "output": "需 86/8=10.75 个月 → 跨 1 个年度，考虑雨季损失取 12 个月"
+    }
+   ]
+  },
+  {
+   "name": "点型感烟探测器的数量计算",
+   "icon": "🔥",
+   "category": "工程设计",
+   "description": "按保护面积与高度计算房间/场所所需点型感烟探测器数量与布置间距，满足火灾自动报警规范。",
+   "formula": "1) 单只保护面积：A=80 m²（h≤6 m 平顶）、60 m²（6<h≤12 m），A=层高修正后取值；\n2) 数量：N≥S/(K·A)，K 为修正系数（一般 1.0，有梁 0.8~0.9）；\n3) 保护半径：R=6.7 m（h≤6 m）、5.8 m（6<h≤12 m）；\n4) 布置间距：≤2R，且距墙≤R/2；\n5) 距障碍物：距墙≥0.5 m、距空调送风口≥1.5 m；\n6) 取整并复核每个探测区≤一个报警区域。",
+   "formula_note": "按《火灾自动报警系统设计规范》GB 50116 表取值，不同场所（车库、厨房、电缆夹层）保护面积不同；梁高>0.6 m 应分区计算；探测器应避开蒸汽、油烟场所（改用感温）。",
+   "variables": [
+    {
+     "key": "room_area",
+     "label": "房间面积 S",
+     "unit": "m²",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "ceiling_height",
+     "label": "房间净高",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "protection_area",
+     "label": "单只保护面积 A",
+     "unit": "m²",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "beam",
+     "label": "是否有梁/吊顶",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《火灾自动报警系统设计规范》GB 50116；探测器数量不足会延误报警，过多则误报频繁。",
+   "examples": [
+    {
+     "title": "数量计算",
+     "input": "S=420 m²，净高 4.5 m，无梁，K=1.0",
+     "output": "A=80 m²；N≥420/80=5.25 → 6 只，按 7 m×10 m 网格布置，保护半径 6.7 m 覆盖校核"
+    }
+   ]
+  },
+  {
+   "name": "建筑物年预计雷击次数计算和防雷分类",
+   "icon": "⚡",
+   "category": "工程设计",
+   "description": "计算建筑物年预计雷击次数，确定防雷类别（第一/二/三类）与相应防护措施。",
+   "formula": "1) 雷击大地的年平均密度：Ng=0.1·Td（Td 为年雷暴日），或 Ng=0.024·Td^1.3；\n2) 等效面积：Ae=[LW+2(L+W)√(H(200−H))+πH(200−H)]·10⁻⁶（km²，H<100 m）；\n3) 年预计雷击次数：N=k·Ng·Ae，k 为校正系数（孤立建筑 2.0、河边湖边 1.5、一般 1.0）；\n4) 分类：N>0.05 且重要建筑 → 第二类；0.01<N≤0.05 → 第三类；N>0.05 的一般建筑亦按第三类；\n5) 措施：接闪器网格（一类 5×5 或 6×4、二类 10×10 或 12×8、三类 20×20 或 24×16）、引下线间距、接地电阻≤10 Ω。",
+   "formula_note": "Td 取当地气象资料近 30 年平均值；H 为建筑物最高点高度；计算 Ae 时相邻建筑应按规范考虑合并影响；爆炸危险场所直接定为第一/二类。",
+   "variables": [
+    {
+     "key": "length",
+     "label": "建筑物长 L",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "width",
+     "label": "建筑物宽 W",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "height",
+     "label": "建筑物高 H",
+     "unit": "m",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "thunder_days",
+     "label": "年平均雷暴日 Td",
+     "unit": "d",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "correction",
+     "label": "校正系数 k",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《建筑物防雷设计规范》GB 50057；雷击次数是防雷分类的定量依据，直接影响接闪网格与引下线布置。",
+   "examples": [
+    {
+     "title": "三类防雷判定",
+     "input": "L=40 m、W=20 m、H=15 m、Td=40、k=1.0",
+     "output": "Ng=0.1×40=4 次/(km²·a)；Ae=[800+2×60×√(15×185)+π×15×185]×1e-6=(800+3062+8718)e-6=0.01258 km²；N=4×0.01258=0.0503 → 接近 0.05，按第二类偏安全设防"
+    }
+   ]
+  },
+  {
+   "name": "岩土体渗透性分级及环境水腐蚀性评价",
+   "icon": "🧪",
+   "category": "地质勘察",
+   "description": "按渗透系数或透水率划分岩土体渗透性等级，并按环境水化学指标评价对混凝土与钢结构的腐蚀性。",
+   "formula": "1) 渗透性分级（岩体按透水率 q，土体按渗透系数 k）：\n   q>100 Lu 极微透水～k<10⁻⁶ cm/s 微透水；10<q≤100 弱透水；1<q≤10 中等透水；q≤1 强透水（对应 k 10⁻⁴~10⁻² cm/s）；\n2) 土体：k<10⁻⁶ 极微透水、10⁻⁶~10⁻⁵ 微、10⁻⁵~10⁻⁴ 弱、10⁻⁴~10⁻² 中等、>10⁻² 强透水；\n3) 腐蚀性：按 SO₄²⁻（<250/250~500/>500 mg/L）、Cl⁻（<100/100~500/>500）、pH（>6.5/5.0~6.5/<5.0）、侵蚀性 CO₂ 判定弱/中/强腐蚀；\n4) 判定表：任一指标达到某等级即按该等级评价；\n5) 结论：提出抗硫酸盐水泥、涂层、增加保护层厚度等防护建议。",
+   "formula_note": "取样应代表地下水位变动带与长期浸水部位，每 200~500 m² 或每层不少于 2 组；透水率 q=Q/(L·p)（Lu），压水试验压力宜 0.3~1.0 MPa；腐蚀等级按《岩土工程勘察规范》GB 50021 判定。",
+   "variables": [
+    {
+     "key": "permeability",
+     "label": "渗透系数 k",
+     "unit": "cm/s",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "lugeon",
+     "label": "透水率 q",
+     "unit": "Lu",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "sulfate",
+     "label": "SO₄²⁻ 含量",
+     "unit": "mg/L",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "chloride",
+     "label": "Cl⁻ 含量",
+     "unit": "mg/L",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "ph",
+     "label": "pH 值",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《岩土工程勘察规范》GB 50021、《水利水电工程地质勘察规范》GB 50487；渗透性分级决定防渗方案，腐蚀性评价决定混凝土与钢材的耐久性措施。",
+   "examples": [
+    {
+     "title": "分级与腐蚀判定",
+     "input": "压水试验 q=8.5 Lu；地下水 SO₄²⁻=620 mg/L、Cl⁻=180 mg/L、pH=6.2",
+     "output": "q=8.5 Lu → 中等透水；SO₄²⁻ 620>500 → 中等腐蚀，Cl⁻ 180 → 弱腐蚀，pH 6.2 → 弱腐蚀；综合按中等腐蚀设防（抗硫酸盐水泥+涂层）"
+    }
+   ]
+  },
+  {
+   "name": "地层信息统计",
+   "icon": "📊",
+   "category": "地质勘察",
+   "description": "统计钻孔各土层厚度、层顶高程、分层统计指标（均值、标准差、变异系数），生成地层统计表与剖面数据。",
+   "formula": "1) 单孔分层：按岩性界线划分层号，记录层顶/层底高程与厚度 hi；\n2) 层厚统计：均值 h̄=Σhi/n、标准差 σ=√[Σ(hi−h̄)²/(n−1)]、变异系数 δ=σ/h̄；\n3) 层顶高程统计：同理计算均值与范围；\n4) 物理力学指标分层统计，剔除异常值（±3σ 或 Grubbs 检验）；\n5) 统计成果：分层承载力、压缩模量、抗剪强度的标准值 fk=μm−1.645σ（保证率 95%）；\n6) 输出：地层统计表、剖面图数据、建议基础持力层。",
+   "formula_note": "统计样本数每层不宜少于 6 组；变异性 δ>0.3 时应分析原因并增加取样；标准值按《岩土工程勘察规范》GB 50021 统计修正。",
+   "variables": [
+    {
+     "key": "borehole_data",
+     "label": "各钻孔分层数据",
+     "unit": "",
+     "required": true,
+     "remark": "孔号、层号、层顶高程、厚度"
+    },
+    {
+     "key": "soil_params",
+     "label": "各层物理力学指标",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "sample_count",
+     "label": "各层样本数",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《岩土工程勘察规范》GB 50021、《水利水电工程地质勘察规范》GB 50487；地层统计是地基承载力与沉降计算的输入。",
+   "examples": [
+    {
+     "title": "层厚统计",
+     "input": "某层厚度 4.2、4.8、5.1、4.5、4.0 m",
+     "output": "h̄=4.52 m；σ=0.44；δ=0.097（变异性小，指标可靠）"
+    }
+   ]
+  },
+  {
+   "name": "岩质边坡稳定性赤平投影分析系统",
+   "icon": "📐",
+   "category": "地质勘察",
+   "description": "用赤平极射投影判别岩质边坡的楔形体滑动、平面滑动与倾倒破坏模式，快速评定边坡稳定性。",
+   "formula": "1) 投影：以边坡坡面、各结构面（倾向/倾角）作赤平投影大圆，投影网用施密特网或等角网；\n2) 平面滑动判别：结构面倾向与坡面倾向夹角<20°、且结构面倾角<坡角、>内摩擦角 → 可能平面滑动；\n3) 楔形滑动：两组结构面交线倾向与坡面夹角<20°、交线倾角<坡角且>φ → 可能楔形滑动；\n4) 倾倒：结构面倾向与坡面相反、倾角>60° 且倾向坡内 → 可能倾倒；\n5) 稳定系数：Fs=(c·A+W·cosψ·tanφ)/(W·sinψ)，ψ 为滑面倾角；\n6) 输出：破坏模式判别结果、危险块体方位、建议支护。",
+   "formula_note": "赤平投影只作定性/半定量判别，重要边坡需做极限平衡或数值分析；结构面产状应分组统计取优势方位；需考虑水压力与爆破松动。",
+   "variables": [
+    {
+     "key": "slope_dip",
+     "label": "坡面倾向/倾角",
+     "unit": "°",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "joint_sets",
+     "label": "结构面组倾向/倾角",
+     "unit": "°",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "friction_angle",
+     "label": "结构面内摩擦角",
+     "unit": "°",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "cohesion",
+     "label": "结构面粘聚力",
+     "unit": "kPa",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《工程岩体分级标准》GB/T 50218、《建筑边坡工程技术规范》GB 50330；赤平投影是岩质边坡快速判别的标准方法。",
+   "examples": [
+    {
+     "title": "平面滑动判别",
+     "input": "坡面倾向 180°、倾角 60°；结构面倾向 175°、倾角 45°；φ=32°",
+     "output": "夹角 5°<20° ✓；45°<60° ✓ 且 45°>32° ✓ → 存在平面滑动可能，Fs=(c·A+W·cos45°·tan32°)/(W·sin45°)，无水 c=0 时 Fs=tan32/tan45=0.62＜1.0 不稳定"
+    }
+   ]
+  },
+  {
+   "name": "土的渗透变形判别",
+   "icon": "🧪",
+   "category": "地质勘察",
+   "description": "判别土的渗透变形类型（流土或管涌），计算临界坡降与允许坡降，为反滤与排水设计提供依据。",
+   "formula": "1) 判别依据：细粒含量 Pc≥35%（砂类土）或塑性指数 Ip>10 → 流土型；Pc<25% 且不均匀系数 Cu>10 → 管涌型；\n2) 流土临界坡降：Jc=(γs−γw)(1−n)/γw≈(Gs−1)(1−n)；\n3) 管涌临界坡降：Jc=2.5(Gs−1)(1−n)·(d5/d20)² 型经验式，或按细粒含量查表；\n4) 允许坡降：[J]=Jc/K，K=2.0~2.5；\n5) 反滤设计：D15/d85≤4~5、D15/d15≥5、D50≤25d50；\n6) 结论：判定变形类型并给出反滤层级配与厚度建议。",
+   "formula_note": "判别应取现场原状样，室内试验（渗透变形试验）是最终依据；级配不连续的土易发生管涌；反滤层是防治管涌最有效手段。",
+   "variables": [
+    {
+     "key": "fine_content",
+     "label": "细粒含量 Pc",
+     "unit": "%",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "uniformity",
+     "label": "不均匀系数 Cu",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "specific_gravity",
+     "label": "土粒比重 Gs",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "porosity",
+     "label": "孔隙率 n",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "d5_d20",
+     "label": "d5、d20 粒径",
+     "unit": "mm",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《土的工程分类标准》GB/T 50145、《碾压式土石坝设计规范》SL 274 附录；渗透变形判别直接决定反滤层与排水体设计。",
+   "examples": [
+    {
+     "title": "流土临界坡降",
+     "input": "Gs=2.66，n=0.40",
+     "output": "Jc=(2.66−1)×0.60=0.996；[J]=0.996/2.2=0.45 → 出口坡降超过 0.45 即有流土风险"
+    }
+   ]
+  },
+  {
+   "name": "岩质边坡结构面视倾角换算",
+   "icon": "📐",
+   "category": "地质勘察",
+   "description": "将结构面真倾角换算为指定剖面方向的视倾角，用于地质剖面图绘制与边坡稳定分析。",
+   "formula": "1) 视倾角公式：tanβ'=tanβ·cos(α−α0)；\n2) β 为结构面真倾角，α 为结构面倾向，α0 为剖面方向（剖面走向的垂直方向）；\n3) 当 α−α0=0 时 β'=β（真倾角）；=90° 时 β'=0（沿走向）；\n4) 视倾向与真倾向一致时取正、相反时取负（倾向剖面方向为正）；\n5) 输出：剖面图上结构面视倾角，用于绘制剖面与计算滑面角度。",
+   "formula_note": "剖面方向应取垂直结构面走向为最不利；多组结构面需分别换算；视倾角小于真倾角，绘制剖面时不可直接使用真倾角。",
+   "variables": [
+    {
+     "key": "true_dip",
+     "label": "结构面真倾角 β",
+     "unit": "°",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "dip_direction",
+     "label": "结构面倾向 α",
+     "unit": "°",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "section_direction",
+     "label": "剖面方向 α0",
+     "unit": "°",
+     "required": true,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水利水电工程地质制图标准》SL 73、《工程地质手册》；视倾角换算是地质剖面图正确表达结构面产状的基础。",
+   "examples": [
+    {
+     "title": "视倾角换算",
+     "input": "β=45°，α=120°，剖面方向 α0=90°",
+     "output": "tanβ'=tan45°×cos30°=0.866 → β'=40.9°"
+    }
+   ]
+  },
+  {
+   "name": "GeoJSON转换",
+   "icon": "🗂️",
+   "category": "地图工具",
+   "description": "在 Shapefile、KML、CSV 坐标与 GeoJSON 之间转换，统一坐标系与属性字段，供前端地图与 GIS 分析使用。",
+   "formula": "1) 读取源数据：Shapefile（.shp+.dbf+.prj）、KML、CSV（经度,纬度）或 CAD DXF；\n2) 坐标系转换：WGS84 ↔ CGCS2000 ↔ 地方坐标，按七参数或四参数转换；\n3) 几何规范化：闭合面、去自相交、统一环方向（外环逆时针）；\n4) 属性映射：字段名转英文、类型统一（字符串/数值）、空值处理；\n5) 输出 GeoJSON：{\"type\":\"FeatureCollection\",\"features\":[...]}，坐标保留 6 位小数；\n6) 校验：几何有效性（OGC Simple Features）、面积/长度与源数据偏差≤0.5%。",
+   "formula_note": "国内地图须使用合规坐标（GCJ-02/加密后的 CGCS2000），不得直接发布 WGS84 原始坐标；涉密测绘成果须按保密规定处理；大文件建议简化（拓扑简化容差 0.5~1 像素）。",
+   "variables": [
+    {
+     "key": "source_format",
+     "label": "源数据格式",
+     "unit": "",
+     "required": true,
+     "remark": "shp/kml/csv/dxf"
+    },
+    {
+     "key": "coordinate_system",
+     "label": "源坐标系",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "target_system",
+     "label": "目标坐标系",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "precision",
+     "label": "坐标保留位数",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《地理信息 地理标记语言》GB/T 27920、《公开地图内容表示规范》；GeoJSON 是 Web 地图（Leaflet/Mapbox/天地图）的标准交换格式。",
+   "examples": [
+    {
+     "title": "CSV 转 GeoJSON",
+     "input": "CSV 含 name,lon,lat 三列，2 条记录：坝址 120.153,30.287；库尾 120.118,30.312",
+     "output": "生成 FeatureCollection，geometry 为 Point，coordinates=[120.153,30.287]（经度在前），properties={\"name\":\"坝址\"}"
+    }
+   ]
+  },
+  {
+   "name": "图例制作",
+   "icon": "🎨",
+   "category": "地图工具",
+   "description": "按地图符号规范制作点、线、面图例，统一配色、字号与标注，输出可复用图例图片或配置。",
+   "formula": "1) 分类：按要素类型（水系、居民地、道路、管线、监测点）分组；\n2) 符号：点用圆形/方形/三角形区分等级，线用实线/虚线/点划线区分等级，面用填充色+晕线；\n3) 配色：同类要素同色系，等级用明度渐变（3~5 级）；对比色仅用于类别区分；\n4) 字号：图例文字 8~10 pt，标题 12 pt，与图面比例协调；\n5) 排版：竖排单列或双列，符号与文字间距 3~5 mm；\n6) 输出：PNG（300 dpi）或 SVG，附符号说明表。",
+   "formula_note": "图例必须与图面符号一一对应，不得遗漏或多余；色盲友好配色（避免红绿对比）适用于公开出版；国家标准图式优先于自定义符号。",
+   "variables": [
+    {
+     "key": "feature_types",
+     "label": "要素类型清单",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "symbol_style",
+     "label": "符号样式偏好",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "output_format",
+     "label": "输出格式",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《国家基本比例尺地图图式》GB/T 20257、《水利水电工程制图标准》SL 73；图例是地图可读性的核心，审查中常因图例不规范被退回。",
+   "examples": [
+    {
+     "title": "三类要素图例",
+     "input": "水库（面）、河道（线）、监测点（点）",
+     "output": "水库：浅蓝填充+深蓝边线；河道：蓝色实线，粗细按等级 0.5/1.0/1.5 pt；监测点：红色三角形 3 mm；图例竖排单列，文字 9 pt"
+    }
+   ]
+  },
+  {
+   "name": "图标管理",
+   "icon": "🧩",
+   "category": "地图工具",
+   "description": "管理地图图标库：统一尺寸、命名、分类与引用路径，避免图标缺失、错位与风格不一。",
+   "formula": "1) 建立图标库目录：按类别（水工/监测/交通/警示）分文件夹；\n2) 命名规范：类别_名称_尺寸.png（如 hydro_dam_24.png）；\n3) 尺寸：统一 24×24、32×32、48×48 三档，2 倍图用于高清屏；\n4) 格式：PNG（透明背景）或 SVG（矢量优先）；\n5) 引用：以图标 ID 索引，禁止硬编码路径；\n6) 校验：遍历检查缺失文件、尺寸偏差、重名，输出清单。",
+   "formula_note": "图标应保持同一视觉风格（线条粗细、圆角一致）；SVG 优先以减小体积；注意图标版权，优先使用自有或开源图标集。",
+   "variables": [
+    {
+     "key": "icon_directory",
+     "label": "图标库目录",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "size_set",
+     "label": "尺寸档位",
+     "unit": "px",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "naming_rule",
+     "label": "命名规则",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水利水电工程制图标准》SL 73、《地图符号设计规范》；图标不一致会显著降低专题图专业性。",
+   "examples": [
+    {
+     "title": "重命名与校验",
+     "input": "目录下有 坝.png、dam-icon.png、Dam32.png",
+     "output": "统一为 hydro_dam_24.png、hydro_dam_32.png、hydro_dam_48.png，并生成缺失尺寸清单"
+    }
+   ]
+  },
+  {
+   "name": "图片矢量化工具",
+   "icon": "🖼️",
+   "category": "地图工具",
+   "description": "把扫描的地形图、断面图、手绘示意图转为可编辑矢量（SVG/DXF），用于成果图重绘与 GIS 入库。",
+   "formula": "1) 预处理：去噪、二值化、纠偏（按图廓四点做透视校正）；\n2) 线划提取：骨架化 + 追踪，得到折线节点；\n3) 矢量化：Potrace 类算法（曲线拟合，容差 0.5~2 像素）输出 SVG 路径；\n4) 地理配准：选取≥3 个控制点，用仿射/多项式变换赋坐标；\n5) 简化：Douglas-Peucker 容差 0.5~1.0 像素，保留形状特征；\n6) 输出：SVG（制图）/DXF（CAD）/GeoJSON（GIS），并做叠加比对。",
+   "formula_note": "矢量化精度受原图分辨率限制，扫描分辨率应≥300 dpi；文字应单独识别（OCR）而非矢量化；地理配准误差应小于 0.2 mm 图上距离。",
+   "variables": [
+    {
+     "key": "image_path",
+     "label": "源图片",
+     "unit": "",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "dpi",
+     "label": "扫描分辨率",
+     "unit": "dpi",
+     "required": true,
+     "remark": ""
+    },
+    {
+     "key": "control_points",
+     "label": "配准控制点坐标",
+     "unit": "",
+     "required": false,
+     "remark": ""
+    },
+    {
+     "key": "tolerance",
+     "label": "拟合容差",
+     "unit": "px",
+     "required": false,
+     "remark": ""
+    }
+   ],
+   "knowledge": "《水利水电工程制图标准》SL 73、《地理信息 数字栅格地图》；矢量化成果须经人工检查，自动结果不能直接作为设计依据。",
+   "examples": [
+    {
+     "title": "断面图矢量化",
+     "input": "扫描断面图 300 dpi，图宽 200 mm，容差 1 px",
+     "output": "输出 SVG 折线约 180 个节点；配准后按 1:500 比例换算，断面长度误差≤0.1 m"
+    }
+   ]
+  }
+ ]
+}

@@ -20,6 +20,16 @@ type MiniToolRepository interface {
 	Update(ctx context.Context, tool *types.MiniTool) error
 	Delete(ctx context.Context, tenantID uint64, id string) error
 	IncrementUsage(ctx context.Context, tenantID uint64, ids []string) error
+
+	// UpsertBuiltin inserts or refreshes one product-shipped card for a
+	// tenant. It keys on (tenant_id, name, owner_user_id=''), which is the
+	// only combination the seeder writes, so a user copying a shipped card
+	// keeps their own row. Returns true when a new card was created.
+	//
+	// Usage counters and the enabled flag of an existing card are preserved:
+	// re-seeding after a catalog update must not reset what the workspace has
+	// done with a card, nor resurrect one an admin deliberately hid.
+	UpsertBuiltin(ctx context.Context, tool *types.MiniTool) (bool, error)
 }
 
 // MiniToolPatch is a partial update: nil fields keep their stored value.

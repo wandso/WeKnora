@@ -120,3 +120,35 @@ func (r *miniToolRepository) IncrementUsage(
 		Where("tenant_id = ? AND id IN ?", tenantID, ids).
 		UpdateColumn("usage_count", gorm.Expr("usage_count + 1")).Error
 }
+
+// UpsertBuiltin keeps the shipped catalog in step with an existing workspace.
+//
+// The lookup deliberately scopes to owner_user_id = ” so a card the user
+// duplicated (which carries their own id) is never overwritten. Content fields
+// are refreshed on every boot-time seed, while usage_count and enabled are
+// left alone: hiding a built-in card is a deliberate admin action and must
+// survive the next catalog release.
+func (r *miniToolRepository) UpsertBuiltin(
+	ctx context.Context, tool *types.MiniTool,
+) (bool, error) {
+	var existing types.MiniTool
+	err := r.db.WithContext(ctx).
+		Where("tenant_id = ? AND name = ? AND owner_user_id = ''", tool.TenantID, tool.Name).
+		First(&existing).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return true, r.db.WithContext(ctx).Create(tool).Error
+	}
+	if err != nil {
+		return false, err
+	}
+	existing.Icon = tool.Icon
+	existing.Category = tool.Category
+	existing.Description = tool.Description
+	existing.Formula = tool.Formula
+	existing.FormulaNote = tool.FormulaNote
+	existing.Variables = tool.Variables
+	existing.Knowledge = tool.Knowledge
+	existing.Examples = tool.Examples
+	existing.Visibility = tool.Visibility
+	return false, r.db.WithContext(ctx).Save(&existing).Error
+}

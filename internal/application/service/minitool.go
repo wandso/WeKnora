@@ -10,7 +10,9 @@ package service
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
+	"sync"
 
 	"github.com/google/uuid"
 
@@ -22,11 +24,54 @@ import (
 
 type miniToolService struct {
 	repo interfaces.MiniToolRepository
+
+	// seeded caches which tenants already received the shipped catalog. The
+	// seed runs once per process per tenant instead of on every list call,
+	// which keeps the picker a single query in the common case.
+	seeded sync.Map
 }
 
 // NewMiniToolService creates the catalog service.
 func NewMiniToolService(repo interfaces.MiniToolRepository) interfaces.MiniToolService {
 	return &miniToolService{repo: repo}
+}
+
+// ensureBuiltins installs the shipped calculation cards into a workspace the
+// first time it reads the catalog.
+//
+// Seeding lazily (rather than at boot) is what makes the cards show up for
+// workspaces created after the server started: registration creates a tenant
+// with no hook into the boot sequence, so a boot-time loop would miss it.
+func (s *miniToolService) ensureBuiltins(ctx context.Context, tenantID uint64) {
+	if _, done := s.seeded.Load(tenantID); done {
+		return
+	}
+	cards, err := types.BuiltinMiniTools()
+	if err != nil {
+		logger.Warnf(ctx, "[MiniTool] builtin catalog unavailable: %v", err)
+		// Cache the failure for this process: a broken embedded file will not
+		// fix itself, and every list call would otherwise retry and log again.
+		s.seeded.Store(tenantID, struct{}{})
+		return
+	}
+	created := 0
+	for _, card := range cards {
+		tool := *card
+		tool.ID = uuid.NewString()
+		tool.TenantID = tenantID
+		tool.OwnerUserID = ""
+		isNew, err := s.repo.UpsertBuiltin(ctx, &tool)
+		if err != nil {
+			logger.Warnf(ctx, "[MiniTool] seed %q for tenant %d failed: %v", card.Name, tenantID, err)
+			return
+		}
+		if isNew {
+			created++
+		}
+	}
+	s.seeded.Store(tenantID, struct{}{})
+	logger.Infof(ctx, "[MiniTool] tenant %d seeded %d/%d builtin cards (%d new)",
+		tenantID, len(cards), len(cards), created)
 }
 
 func (s *miniToolService) caller(ctx context.Context) (uint64, string, types.TenantRole, error) {
@@ -40,6 +85,13 @@ func (s *miniToolService) caller(ctx context.Context) (uint64, string, types.Ten
 
 func canManageMiniTool(tool *types.MiniTool, userID string, role types.TenantRole) bool {
 	if tool == nil {
+		return false
+	}
+	// A shipped card has no owner. It is a shared preset that the seeder
+	// refreshes whenever the catalog ships a corrected formula, so allowing
+	// in-place edits would silently lose them on the next restart. Callers who
+	// want their own numbers duplicate the card instead.
+	if tool.OwnerUserID == "" {
 		return false
 	}
 	if role == types.TenantRoleOwner || role == types.TenantRoleAdmin {
@@ -78,6 +130,7 @@ func (s *miniToolService) List(
 	if query.Scope == "mine" {
 		query.OwnerUserID = userID
 	}
+	s.ensureBuiltins(ctx, tenantID)
 	tools, err := s.repo.List(ctx, tenantID, query)
 	if err != nil {
 		return nil, err
@@ -315,7 +368,32 @@ func (s *miniToolService) ListForRun(
 		seen[tool.ID] = struct{}{}
 		out = append(out, tool)
 	}
-	return out
+	return capMiniToolsForTurn(ctx, out)
+}
+
+// maxMiniToolsPerTurn bounds how many cards a single turn can carry.
+//
+// The shipped catalog is over a hundred cards, and every card expands into its
+// formula, inputs, domain notes and a worked example. Selecting "all" on such a
+// catalog would spend more context on presets than on the question, so the
+// surplus is dropped — most-used first, then by name so the choice is stable
+// across turns rather than dependent on row order.
+const maxMiniToolsPerTurn = 12
+
+func capMiniToolsForTurn(ctx context.Context, tools []*types.MiniTool) []*types.MiniTool {
+	if len(tools) <= maxMiniToolsPerTurn {
+		return tools
+	}
+	sort.SliceStable(tools, func(i, j int) bool {
+		if tools[i].UsageCount != tools[j].UsageCount {
+			return tools[i].UsageCount > tools[j].UsageCount
+		}
+		return tools[i].Name < tools[j].Name
+	})
+	logger.Warnf(ctx,
+		"[MiniTool] %d cards attached to one turn, keeping the %d most used; ask the user to narrow the selection",
+		len(tools), maxMiniToolsPerTurn)
+	return tools[:maxMiniToolsPerTurn]
 }
 
 // listByIDs fetches extra cards without failing the whole turn: a mention of a
