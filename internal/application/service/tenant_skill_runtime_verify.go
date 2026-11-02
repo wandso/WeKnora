@@ -49,6 +49,38 @@ type skillRuntimeReport struct {
 	Notes    []string `json:"notes"`
 }
 
+// installReportPath is where a bundle may ship a pre-written report, relative
+// to the skill root.
+const installReportPath = ".weknora/install-report.json"
+
+// bundleDeclaresNoRuntimeWork reports whether the bundle carries a vendor
+// install report that declares no runtime commands and no blockers.
+//
+// A report like that is a statement that the skill is documentation only:
+// nothing to install, nothing to check. The installer agent still has to run
+// otherwise — it is the thing that discovers requirements — but when the
+// answer is already on disk there is nothing for it to discover, so the
+// install goes straight to verification. The verification gate still runs and
+// still refuses a report it disagrees with, so this skips work, not checks.
+//
+// A malformed report is not trusted here: it falls through to the agent, which
+// will rewrite it, and verification will reject it if it stays broken.
+func bundleDeclaresNoRuntimeWork(bundle *SkillBundle) bool {
+	if bundle == nil {
+		return false
+	}
+	raw, ok := bundle.Files[installReportPath]
+	if !ok || len(raw) > 64*1024 {
+		return false
+	}
+	var report skillRuntimeReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		return false
+	}
+	return report.Commands != nil && report.Blockers != nil &&
+		len(report.Commands) == 0 && len(report.Blockers) == 0
+}
+
 // The agent discovers prerequisites; this gate independently checks executable
 // availability and refuses explicitly unresolved setup before snapshotting.
 // The report's notes are returned even when the gate refuses, so whoever reads

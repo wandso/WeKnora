@@ -1003,6 +1003,23 @@ type installerJob struct {
 func (s *TenantSkillService) installDependenciesAndVerify(
 	ctx context.Context, job installerJob,
 ) (err error) {
+	// A bundle that ships its own install report declaring no runtime commands
+	// and no blockers has nothing to discover and nothing to install. Running
+	// the agent anyway spends a whole ReAct conversation reproducing a file the
+	// vendor already wrote, and on a CPU-only model that is the difference
+	// between a 30-second install and a 15-minute one.
+	if bundleDeclaresNoRuntimeWork(job.bundle) {
+		logger.Infof(ctx,
+			"[skill] %s ships a clean install report; skipping the installer agent", job.skillID)
+		s.publishProgress(ctx, job.tenantID, job.configID, job.skillID,
+			SkillProgress{Percent: 80, Stage: "agent_done"})
+		job.transcript.muteActivityProgress()
+		notes, verifyErr := s.verifySkill(ctx, job.mgr, job.sess.ID, job.skillDir, job.bundle)
+		s.reportVerificationNotes(ctx, job, notes)
+		job.transcript.Finish(context.WithoutCancel(ctx), verifyErr)
+		return verifyErr
+	}
+
 	run, err := s.openInstallerRun(ctx, job.tenantID, job.configID, job.sess, job.skillDir, job.transcript)
 	if err != nil {
 		job.transcript.Finish(context.WithoutCancel(ctx), err)
@@ -2283,8 +2300,21 @@ func installerAgentConfig(
 	cfg.MemoryEnabled = &memoryOff
 	cfg.MultiTurnEnabled = custom.MultiTurnEnabled
 	cfg.LLMCallTimeout = custom.LLMCallTimeout
+	// An install is a background job, not a chat turn. Nobody is watching the
+	// stream, the prompt is long, and a CPU-only model can spend minutes in
+	// prefill before the first token — which the chat-sized two-minute stall
+	// budget reads as a dead connection and cancels, on a loop. The verify
+	// step below is what decides whether the install worked, so waiting longer
+	// costs latency, not correctness.
+	if cfg.LLMCallTimeout < installStallTimeoutFloorSec {
+		cfg.LLMCallTimeout = installStallTimeoutFloorSec
+	}
 	return cfg
 }
+
+// installStallTimeoutFloorSec is the minimum silence budget for the installer
+// agent, in seconds.
+const installStallTimeoutFloorSec = 600
 
 // unionTools returns configured plus every name in required that it is missing,
 // preserving the configured order so a deployment's own list still reads as it

@@ -276,6 +276,17 @@ func ValidateDockerHost(host string, allowPrivate bool) error {
 			return fmt.Errorf("sandbox: docker unix socket path %q must be absolute", address)
 		}
 		return nil
+	case "npipe":
+		// Docker Desktop on Windows publishes the daemon as a named pipe
+		// (npipe:////./pipe/dockerDesktopLinuxEngine), which is the same trust
+		// class as a unix socket: local to this machine, carrying no address a
+		// dial guard could check. Without this the whole Docker backend is
+		// unusable on Windows, because the CLI context resolves to npipe and
+		// the config can never be saved.
+		if !strings.HasPrefix(address, "//") && !strings.HasPrefix(address, `\\`) {
+			return fmt.Errorf("sandbox: docker named pipe path %q must start with //", address)
+		}
+		return nil
 	case "tcp", "http", "https":
 		// The guard speaks HTTP; the daemon's TCP endpoint is an HTTP
 		// endpoint, so the check is the same one every other backend gets.
