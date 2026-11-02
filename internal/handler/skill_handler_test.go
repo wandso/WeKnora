@@ -90,7 +90,14 @@ func TestListSkillsReturnsUsableInstalledSkillsForTheSelectedConfig(t *testing.T
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
 	require.True(t, body.Success)
 	require.True(t, body.SkillsAvailable)
+	// An unlabelled skill is reported as unclassified/medium rather than blank:
+	// the picker badges it as "未分类" and operators see it is not vetted.
 	require.Equal(t, []SkillInfoResponse{
-		{Name: "ppt-generator", Description: "make ppt"},
+		{
+			Name:        "ppt-generator",
+			Description: "make ppt",
+			Category:    "unclassified",
+			RiskLevel:   "medium",
+		},
 	}, body.Data)
 }
