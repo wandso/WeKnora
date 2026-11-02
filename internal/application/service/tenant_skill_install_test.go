@@ -3528,3 +3528,17 @@ func (f *installFixture) currentInstallMessageID() string {
 	}
 	return row.InstallMessageID
 }
+
+// Added for the visibility feature. Test fakes never publish anything, so an
+// empty public list keeps every existing assertion valid.
+func (r *installSkillRepo) ListPublicCatalogs(
+	_ context.Context, _ uint64,
+) ([]*types.TenantSkillCatalogEntity, error) {
+	return nil, nil
+}
+
+func (r *installSkillRepo) SetCatalogVisibility(
+	_ context.Context, _ uint64, _ string, _ string,
+) error {
+	return nil
+}

@@ -256,6 +256,45 @@ func (h *SkillHandler) DeleteCatalog(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
+// SetCatalogVisibility godoc
+// @Summary      Set the visibility of a catalog skill
+// @Description  private (creator plus workspace Owner/Admin) / workspace (all members) / public (discoverable and installable from every workspace). Only the owning workspace may change it.
+// @Tags         Skills
+// @Accept       json
+// @Produce      json
+// @Param        id   path  string  true  "Catalog skill ID"
+// @Success      200  {object}  handler.DataResponse{data=object}
+// @Router       /skills/catalog/{id}/visibility [put]
+func (h *SkillHandler) SetCatalogVisibility(c *gin.Context) {
+	if h.catalog == nil {
+		_ = c.Error(apperrors.NewInternalServerError("skill catalog is not configured"))
+		return
+	}
+	var req struct {
+		Visibility string `json:"visibility"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		_ = c.Error(apperrors.NewBadRequestError("Invalid request data").WithDetails(err.Error()))
+		return
+	}
+	// sandboxConfigTenantID is the caller's own workspace; a guard must not be
+	// allowed to rewrite it, since visibility is decided by the owner.
+	catalog, err := h.catalog.SetCatalogVisibility(
+		c.Request.Context(), sandboxConfigTenantID(c), c.Param("id"), req.Visibility,
+	)
+	if err != nil {
+		respondSkillServiceError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"id":         catalog.ID,
+			"visibility": types.NormalizeSkillVisibility(catalog.Visibility),
+		},
+	})
+}
+
 // ListCatalogFiles godoc
 // @Summary      List files of a catalog skill
 // @Description  Lists the stored catalog bundle. Files belong to the skill definition, not a sandbox install.

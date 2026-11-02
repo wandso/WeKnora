@@ -167,6 +167,11 @@ func RegisterMCPServiceRoutes(
 		mcpServices.GET("/:id", g.Viewer(), handler.GetMCPService)
 		// Update MCP service — Admin+
 		mcpServices.PUT("/:id", g.Admin(), handler.UpdateMCPService)
+		// Visibility is a workspace-policy switch rather than a connection
+		// edit, so it is its own route: it writes one column and never
+		// re-submits credentials. The service layer additionally requires the
+		// row to belong to the caller's workspace.
+		mcpServices.PUT("/:id/visibility", g.Admin(), handler.SetMCPVisibility)
 		// Delete MCP service — Admin+
 		mcpServices.DELETE("/:id", g.Admin(), handler.DeleteMCPService)
 		// Test MCP service connection — Admin+ (probes external infra)

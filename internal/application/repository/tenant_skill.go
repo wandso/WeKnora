@@ -84,12 +84,19 @@ type TenantSkillRepository interface {
 
 	// CreateCatalog inserts a tenant-level skill definition.
 	CreateCatalog(ctx context.Context, e *types.TenantSkillCatalogEntity) error
-	// GetCatalog returns nil when the row is missing or belongs to another workspace.
+	// GetCatalog returns nil when the row is missing, or when it belongs to
+	// another workspace and is not public. A returned row may therefore be
+	// owned by a different tenant than the one passed in; callers that read
+	// the bundle must use row.TenantID.
 	GetCatalog(ctx context.Context, tenantID uint64, catalogID string) (*types.TenantSkillCatalogEntity, error)
 	// GetCatalogByName scopes lookup by workspace because names are unique per tenant.
 	GetCatalogByName(ctx context.Context, tenantID uint64, name string) (*types.TenantSkillCatalogEntity, error)
 	// ListCatalogsByTenant returns every live catalog row of one workspace.
 	ListCatalogsByTenant(ctx context.Context, tenantID uint64) ([]*types.TenantSkillCatalogEntity, error)
+	// ListPublicCatalogs returns definitions other workspaces published.
+	ListPublicCatalogs(ctx context.Context, excludeTenantID uint64) ([]*types.TenantSkillCatalogEntity, error)
+	// SetCatalogVisibility rewrites only the visibility column of an owned row.
+	SetCatalogVisibility(ctx context.Context, tenantID uint64, catalogID string, visibility string) error
 	// UpdateCatalog writes mutable definition fields (bundle, description, version).
 	UpdateCatalog(ctx context.Context, e *types.TenantSkillCatalogEntity) error
 	// DeleteCatalog soft-deletes a definition. Install rows are not touched.
@@ -410,12 +417,20 @@ func (r *tenantSkillRepository) CreateCatalog(ctx context.Context, e *types.Tena
 	return r.db.WithContext(ctx).Create(e).Error
 }
 
+// GetCatalog resolves a definition by id, including one another workspace has
+// published.
+//
+// The returned row carries its owning tenant, and every caller that touches the
+// bundle must use that tenant rather than the caller's: the zip lives under the
+// owning workspace's storage prefix. GetCatalogByName is deliberately NOT
+// widened — it backs the upsert path, where matching somebody else's definition
+// of the same name would silently rewrite their skill.
 func (r *tenantSkillRepository) GetCatalog(
 	ctx context.Context, tenantID uint64, catalogID string,
 ) (*types.TenantSkillCatalogEntity, error) {
 	var e types.TenantSkillCatalogEntity
 	err := r.db.WithContext(ctx).
-		Where("tenant_id = ? AND id = ?", tenantID, catalogID).
+		Where("id = ? AND (tenant_id = ? OR visibility = 'public')", catalogID, tenantID).
 		First(&e).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
@@ -454,6 +469,37 @@ func (r *tenantSkillRepository) ListCatalogsByTenant(
 		return nil, err
 	}
 	return list, nil
+}
+
+// ListPublicCatalogs returns definitions other workspaces have published.
+//
+// Separate from ListCatalogsByTenant so the "mine" list keeps its exact meaning
+// and the merge happens in one visible place in the service layer.
+func (r *tenantSkillRepository) ListPublicCatalogs(
+	ctx context.Context, excludeTenantID uint64,
+) ([]*types.TenantSkillCatalogEntity, error) {
+	var list []*types.TenantSkillCatalogEntity
+	err := r.db.WithContext(ctx).
+		Where("visibility = 'public' AND tenant_id <> ?", excludeTenantID).
+		Order("created_at DESC").
+		Find(&list).Error
+	if err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+// SetCatalogVisibility rewrites only the visibility column.
+func (r *tenantSkillRepository) SetCatalogVisibility(
+	ctx context.Context, tenantID uint64, catalogID string, visibility string,
+) error {
+	return r.db.WithContext(ctx).
+		Model(&types.TenantSkillCatalogEntity{}).
+		Where("id = ? AND tenant_id = ?", catalogID, tenantID).
+		Updates(map[string]interface{}{
+			"visibility": visibility,
+			"updated_at": time.Now(),
+		}).Error
 }
 
 func (r *tenantSkillRepository) UpdateCatalog(ctx context.Context, e *types.TenantSkillCatalogEntity) error {

@@ -658,3 +658,10 @@ func TestUpdateMCPService_ClientIDChangeRebuildsConnections(t *testing.T) {
 	_, ok = svc.mcpManager.GetClient("svc")
 	assert.False(t, ok, "a new client_id rebuilds the connection")
 }
+
+// Added for the visibility feature; the fake has no persistence to update.
+func (r *fakeMCPRepo) SetVisibility(
+	_ context.Context, _ uint64, _ string, _ string,
+) error {
+	return nil
+}

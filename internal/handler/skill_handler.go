@@ -40,6 +40,9 @@ type skillCatalogService interface {
 	RegisterCatalogFromSource(ctx context.Context, tenantID uint64, source string) (*types.TenantSkillCatalogEntity, error)
 	InstallCatalogToConfigs(ctx context.Context, tenantID uint64, catalogID string, configIDs []string) (*service.CatalogInstallResult, error)
 	DeleteCatalog(ctx context.Context, tenantID uint64, catalogID string) error
+	SetCatalogVisibility(
+		ctx context.Context, callerTenantID uint64, catalogID string, visibility string,
+	) (*types.TenantSkillCatalogEntity, error)
 	ListCatalogFiles(ctx context.Context, tenantID uint64, catalogID string) ([]service.SkillFileEntry, error)
 	ReadCatalogFile(ctx context.Context, tenantID uint64, catalogID, relativePath string) (*service.SkillFileContent, error)
 }

@@ -28,6 +28,10 @@ type MCPServiceRepository interface {
 
 	// Delete deletes an MCP service (soft delete)
 	Delete(ctx context.Context, tenantID uint64, id string) error
+
+	// SetVisibility rewrites only the visibility column of a row owned by the
+	// given workspace.
+	SetVisibility(ctx context.Context, tenantID uint64, id string, visibility string) error
 }
 
 // MCPServiceService defines the interface for MCP service business logic
@@ -87,4 +91,11 @@ type MCPServiceService interface {
 	// Implementations MUST close any active MCP client connection for this
 	// service. Clearing a field that is already empty is a no-op (no error).
 	ClearMCPCredential(ctx context.Context, tenantID uint64, id, field string) error
+
+	// SetMCPVisibility changes who can reach a service without touching its
+	// connection settings or credentials. Only the owning workspace may call
+	// it, and builtin rows are refused: they are already visible everywhere.
+	SetMCPVisibility(
+		ctx context.Context, callerTenantID uint64, id string, visibility string,
+	) (*types.MCPService, error)
 }

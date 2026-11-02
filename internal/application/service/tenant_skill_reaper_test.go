@@ -1073,3 +1073,15 @@ func (p *reaperSnapshotProvider) Execute(context.Context, *sandbox.ExecuteConfig
 func (p *reaperSnapshotProvider) Cleanup(context.Context) error { return nil }
 func (p *reaperSnapshotProvider) GetSandbox() sandbox.Sandbox   { return nil }
 func (p *reaperSnapshotProvider) GetType() sandbox.SandboxType  { return sandbox.SandboxTypeE2B }
+
+func (r *reaperSkillStore) ListPublicCatalogs(
+	_ context.Context, _ uint64,
+) ([]*types.TenantSkillCatalogEntity, error) {
+	return nil, nil
+}
+
+func (r *reaperSkillStore) SetCatalogVisibility(
+	_ context.Context, _ uint64, _ string, _ string,
+) error {
+	return nil
+}

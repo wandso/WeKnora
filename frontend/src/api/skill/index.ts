@@ -1,4 +1,4 @@
-import { del, get, post, postUpload } from "../../utils/request";
+import { del, get, post, postUpload, put } from "../../utils/request";
 import type { ConfigSkillFileContent, ConfigSkillFileEntry } from "../system";
 
 // Skill信息
@@ -45,6 +45,14 @@ export interface SkillCatalogItem {
   risk_level?: string;
   keywords?: string[];
   prompt_hint?: string;
+  // Who may discover and install this definition. Public definitions owned by
+  // another workspace arrive with is_foreign=true and every write flag false;
+  // they can be installed into this workspace's own sandbox but not edited.
+  visibility?: 'private' | 'workspace' | 'public';
+  is_foreign?: boolean;
+  can_edit?: boolean;
+  can_delete?: boolean;
+  can_share?: boolean;
 }
 
 export interface SkillCatalogRegisterResult {
@@ -112,6 +120,21 @@ export function installSkillCatalog(catalogId: string, sandboxConfigIds: string[
 
 export function deleteSkillCatalog(catalogId: string) {
   return del(`/api/v1/skills/catalog/${catalogId}`);
+}
+
+/**
+ * Change only the visibility of a definition. Separate from registration
+ * because it is a workspace policy decision, not a content change, and it must
+ * keep working for definitions whose bundle this caller cannot re-upload.
+ */
+export function setSkillCatalogVisibility(
+  catalogId: string,
+  visibility: 'private' | 'workspace' | 'public',
+) {
+  return put<{ data: { id: string; visibility: string } }>(
+    `/api/v1/skills/catalog/${catalogId}/visibility`,
+    { visibility },
+  );
 }
 
 export function listCatalogSkillFiles(catalogId: string) {

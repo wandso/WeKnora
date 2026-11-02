@@ -79,17 +79,51 @@
                     :class="`skill-tag--risk-${governanceOf(item).risk}`" :title="governanceTooltip(item)">
                     {{ riskLabel(item) }}
                   </span>
+                  <span v-if="item.is_foreign" class="skill-tag skill-tag--foreign" :title="$t('settings.skills.foreignBadge')">
+                    {{ $t('settings.skills.foreignBadge') }}
+                  </span>
+                  <span v-else-if="item.visibility && item.visibility !== 'workspace'" class="skill-tag"
+                    :class="{ 'skill-tag--public': item.visibility === 'public' }">
+                    {{ visibilityLabel(item) }}
+                  </span>
                 </div>
                 <div class="skill-card__actions">
                   <button type="button" class="skill-card__icon-btn" :title="$t('settings.sandbox.skillFiles')"
                     :aria-label="$t('settings.sandbox.skillFiles')" @click="openCatalogFiles(item)">
                     <folder-icon size="14px" />
                   </button>
-                  <button v-if="canDelete(item)" type="button" class="skill-card__icon-btn skill-card__icon-btn--danger"
-                    :disabled="deletingId === item.id" :title="$t('settings.skills.deleteCatalog')"
-                    :aria-label="$t('settings.skills.deleteCatalog')" @click="askDelete(item)">
-                    <delete-icon size="14px" />
-                  </button>
+                  <!-- Visibility lives here rather than in the install drawer:
+                       sharing a definition is a one-click policy decision, and
+                       the drawer only opens for definitions this workspace
+                       owns. Delete moved in here with it so the card keeps one
+                       overflow affordance instead of three competing icons. -->
+                  <t-popup v-if="canShare(item) || canDelete(item)" :visible="openMenuId === item.id"
+                    @visible-change="(visible: boolean) => setOpenMenu(item.id, visible)"
+                    overlayClassName="card-more-popup" trigger="click" destroy-on-close placement="bottom-right">
+                    <button type="button" class="skill-card__icon-btn" :aria-label="$t('common.expand')"
+                      :aria-expanded="openMenuId === item.id" aria-haspopup="true">
+                      <t-icon name="ellipsis" size="14px" />
+                    </button>
+                    <template #content>
+                      <div class="popup-menu">
+                        <template v-if="canShare(item)">
+                          <div class="popup-menu-section-title">{{ $t('settings.skills.visibility') }}</div>
+                          <div v-for="opt in VISIBILITY_OPTIONS" :key="opt.value" class="popup-menu-item visibility-option"
+                            :class="{ 'is-current': (item.visibility || 'workspace') === opt.value }"
+                            @click.stop="changeVisibility(item, opt.value)">
+                            <t-icon class="menu-icon"
+                              :name="(item.visibility || 'workspace') === opt.value ? 'check' : opt.icon" />
+                            <span>{{ $t(opt.labelKey) }}</span>
+                          </div>
+                          <div v-if="canDelete(item)" class="popup-menu-divider"></div>
+                        </template>
+                        <div v-if="canDelete(item)" class="popup-menu-item delete" @click="askDelete(item)">
+                          <t-icon class="menu-icon" name="delete" />
+                          <span>{{ $t('settings.skills.deleteCatalog') }}</span>
+                        </div>
+                      </div>
+                    </template>
+                  </t-popup>
                 </div>
               </div>
               <p v-if="item.description" class="skill-card__desc" :title="item.description">
@@ -418,6 +452,7 @@ import {
   listSkillCatalog,
   registerSkillCatalogFromFile,
   registerSkillCatalogFromSource,
+  setSkillCatalogVisibility,
   type SkillCatalogInstall,
   type SkillCatalogItem,
   type SkillCatalogRegisterResult,
@@ -660,7 +695,55 @@ function liveInstalls(item: SkillCatalogItem): SkillCatalogInstall[] {
 }
 
 function canDelete(item: SkillCatalogItem): boolean {
+  // A definition owned by another workspace is never deletable from here, and
+  // the server refuses it anyway — but the check has to happen before the
+  // install-count heuristic, because a foreign definition always has zero
+  // local installations.
+  if (item.can_delete === false || item.is_foreign) return false
   return liveInstalls(item).length === 0
+}
+
+// Same three levels and ordering as the knowledge base, mini tool and MCP
+// menus.
+const VISIBILITY_OPTIONS: Array<{
+  value: 'private' | 'workspace' | 'public'
+  labelKey: string
+  icon: string
+}> = [
+  { value: 'private', labelKey: 'settings.skills.visibilityPrivate', icon: 'lock-on' },
+  { value: 'workspace', labelKey: 'settings.skills.visibilityWorkspace', icon: 'usergroup' },
+  { value: 'public', labelKey: 'settings.skills.visibilityPublic', icon: 'earth' },
+]
+
+const openMenuId = ref('')
+
+function setOpenMenu(id: string, visible: boolean) {
+  openMenuId.value = visible ? id : (openMenuId.value === id ? '' : openMenuId.value)
+}
+
+function canShare(item: SkillCatalogItem): boolean {
+  return item.can_share === true
+}
+
+function visibilityLabel(item: SkillCatalogItem): string {
+  if (item.visibility === 'public') return t('settings.skills.visibilityPublic')
+  if (item.visibility === 'private') return t('settings.skills.visibilityPrivate')
+  return t('settings.skills.visibilityWorkspace')
+}
+
+async function changeVisibility(
+  item: SkillCatalogItem,
+  visibility: 'private' | 'workspace' | 'public',
+) {
+  openMenuId.value = ''
+  if ((item.visibility || 'workspace') === visibility) return
+  try {
+    await setSkillCatalogVisibility(item.id, visibility)
+    MessagePlugin.success(t('settings.skills.visibilityUpdated'))
+    await loadCatalog()
+  } catch (error) {
+    MessagePlugin.error(t('settings.skills.visibilityUpdateFailed'))
+  }
 }
 
 function targetsFor(item: SkillCatalogItem): SandboxConfigRecord[] {
@@ -1796,6 +1879,22 @@ onUnmounted(() => {
   font-weight: 500;
   line-height: 16px;
   white-space: nowrap;
+}
+
+/* Visibility badge. Public earns the accent because publishing a definition
+   outside the workspace is the consequential case; "workspace" is the quiet
+   default and is not badged at all. */
+.skill-tag--public {
+  border-color: color-mix(in srgb, var(--td-brand-color) 32%, transparent);
+  background: color-mix(in srgb, var(--td-brand-color) 10%, transparent);
+  color: var(--td-brand-color);
+}
+
+.skill-tag--foreign {
+  border-color: var(--td-component-stroke);
+  border-style: dashed;
+  background: transparent;
+  color: var(--td-text-color-placeholder);
 }
 
 .skill-tag--category-safe {

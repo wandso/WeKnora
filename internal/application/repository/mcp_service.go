@@ -3,11 +3,22 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"gorm.io/gorm"
 )
+
+// mcpServiceVisibleTo is the read predicate for a workspace: its own rows, the
+// product-shipped builtin rows, and any row another workspace published.
+//
+// It must stay in one place. GetByID, List and ListByIDs all feed different
+// code paths — the settings page, the agent editor's service picker and the
+// runtime directory lookup — and a predicate that drifts between them produces
+// the worst failure mode: a service listed but 404 on open, or tools that
+// vanish mid-conversation.
+const mcpServiceVisibleTo = "tenant_id = ? OR is_builtin = true OR visibility = 'public'"
 
 // mcpServiceRepository implements the MCPServiceRepository interface
 type mcpServiceRepository struct {
@@ -30,7 +41,7 @@ func (r *mcpServiceRepository) GetByID(ctx context.Context, tenantID uint64, id 
 	var service types.MCPService
 	err := r.db.WithContext(ctx).
 		Where("id = ?", id).
-		Where("tenant_id = ? OR is_builtin = true", tenantID).
+		Where(mcpServiceVisibleTo, tenantID).
 		First(&service).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -47,7 +58,7 @@ func (r *mcpServiceRepository) GetByID(ctx context.Context, tenantID uint64, id 
 func (r *mcpServiceRepository) List(ctx context.Context, tenantID uint64) ([]*types.MCPService, error) {
 	var services []*types.MCPService
 	err := r.db.WithContext(ctx).
-		Where("tenant_id = ? OR is_builtin = true", tenantID).
+		Where(mcpServiceVisibleTo, tenantID).
 		Order("created_at DESC").
 		Find(&services).Error
 	if err != nil {
@@ -62,7 +73,7 @@ func (r *mcpServiceRepository) List(ctx context.Context, tenantID uint64) ([]*ty
 func (r *mcpServiceRepository) ListEnabled(ctx context.Context, tenantID uint64) ([]*types.MCPService, error) {
 	var services []*types.MCPService
 	err := r.db.WithContext(ctx).
-		Where("(tenant_id = ? OR is_builtin = true) AND enabled = ?", tenantID, true).
+		Where("("+mcpServiceVisibleTo+") AND enabled = ?", tenantID, true).
 		Order("created_at DESC").
 		Find(&services).Error
 	if err != nil {
@@ -85,7 +96,7 @@ func (r *mcpServiceRepository) ListByIDs(
 
 	var services []*types.MCPService
 	err := r.db.WithContext(ctx).
-		Where("(tenant_id = ? OR is_builtin = true) AND id IN ?", tenantID, ids).
+		Where("("+mcpServiceVisibleTo+") AND id IN ?", tenantID, ids).
 		Find(&services).Error
 	if err != nil {
 		return nil, err
@@ -137,6 +148,23 @@ func (r *mcpServiceRepository) Update(ctx context.Context, service *types.MCPSer
 		Model(&types.MCPService{}).
 		Where("id = ? AND tenant_id = ?", service.ID, service.TenantID).
 		Updates(updateMap).Error
+}
+
+// SetVisibility rewrites only the visibility column of one row.
+//
+// Column-level rather than a full Update: Update rewrites URL, headers and
+// credentials from the in-memory copy, and a stale copy here would silently
+// revert a credential rotation that happened in between.
+func (r *mcpServiceRepository) SetVisibility(
+	ctx context.Context, tenantID uint64, id string, visibility string,
+) error {
+	return r.db.WithContext(ctx).
+		Model(&types.MCPService{}).
+		Where("id = ? AND tenant_id = ?", id, tenantID).
+		Updates(map[string]interface{}{
+			"visibility": visibility,
+			"updated_at": time.Now(),
+		}).Error
 }
 
 // Delete deletes an MCP service (soft delete)

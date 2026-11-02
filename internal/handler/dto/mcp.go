@@ -36,8 +36,16 @@ type MCPServiceResponse struct {
 	StdioConfig       *types.MCPStdioConfig    `json:"stdio_config,omitempty"`
 	EnvVars           types.MCPEnvVars         `json:"env_vars,omitempty"`
 	IsBuiltin         bool                     `json:"is_builtin" extensions:"x-agent"`
-	CreatedAt         time.Time                `json:"created_at"`
-	UpdatedAt         time.Time                `json:"updated_at"`
+	// Visibility is private / workspace / public. IsForeign marks a row that
+	// belongs to another workspace and is reachable only because it is public;
+	// the UI labels it and hides every write affordance.
+	Visibility string    `json:"visibility"`
+	IsForeign  bool      `json:"is_foreign"`
+	CanEdit    bool      `json:"can_edit"`
+	CanDelete  bool      `json:"can_delete"`
+	CanShare   bool      `json:"can_share"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 	// Credentials is the per-field "configured?" map. Embedded on the main
 	// response so the credential UI doesn't need a follow-up GET. The
 	// frontend never sees the actual secret value — only whether one is
@@ -87,6 +95,13 @@ func NewMCPServiceResponse(ctx context.Context, svc *types.MCPService) *MCPServi
 		return nil
 	}
 	includeDetail := CanViewIntegrationSecrets(ctx)
+	// A row from another workspace reaches us only through public visibility.
+	// The caller may USE it (the runtime resolves credentials from the owning
+	// workspace), but the connection details themselves belong to that
+	// workspace: echoing URL / headers / auth config here would hand an admin
+	// of one workspace the API key of another.
+	callerTenantID, hasCaller := types.TenantIDFromContext(ctx)
+	foreign := hasCaller && callerTenantID != 0 && svc.TenantID != callerTenantID
 	resp := &MCPServiceResponse{
 		ID:                svc.ID,
 		TenantID:          svc.TenantID,
@@ -101,10 +116,15 @@ func NewMCPServiceResponse(ctx context.Context, svc *types.MCPService) *MCPServi
 		StdioConfig:       svc.StdioConfig,
 		EnvVars:           svc.EnvVars,
 		IsBuiltin:         svc.IsBuiltin,
+		Visibility:        types.NormalizeMCPVisibility(svc.Visibility),
+		IsForeign:         foreign,
+		CanEdit:           svc.CanEdit,
+		CanDelete:         svc.CanDelete,
+		CanShare:          svc.CanShare,
 		CreatedAt:         svc.CreatedAt,
 		UpdatedAt:         svc.UpdatedAt,
 	}
-	if !includeDetail {
+	if !includeDetail || foreign {
 		resp.Headers = nil
 		resp.EnvVars = nil
 		resp.URL = nil
@@ -120,19 +140,25 @@ func NewMCPServiceResponse(ctx context.Context, svc *types.MCPService) *MCPServi
 			AuthServerMetadataURL: svc.AuthConfig.AuthServerMetadataURL,
 			ClientID:              svc.AuthConfig.ClientID,
 		}
-		if !includeDetail {
+		if !includeDetail || foreign {
 			auth.CustomHeaders = nil
 		}
 		resp.AuthConfig = auth
 	}
-	if svc.IsBuiltin {
+	if svc.IsBuiltin || foreign {
 		// Builtin services are shared across tenants — strip everything that
-		// could leak how this tenant configured the underlying provider.
+		// could leak how this tenant configured the underlying provider. A
+		// foreign public row is in the same position: usable, not inspectable.
 		resp.URL = nil
 		resp.Headers = nil
 		resp.EnvVars = nil
 		resp.StdioConfig = nil
+		resp.AdvancedConfig = nil
 		resp.AuthConfig = nil
+		// Credential metadata describes the OWNING workspace's secrets, so it
+		// is meaningless here. Leave it empty rather than report "configured"
+		// for a key this caller cannot rotate.
+		resp.Credentials = nil
 	} else {
 		resp.Credentials = map[string]CredentialFieldMetadata{
 			"api_key":       {Configured: svc.AuthConfig != nil && svc.AuthConfig.APIKey != ""},

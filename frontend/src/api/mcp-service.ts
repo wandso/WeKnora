@@ -47,6 +47,14 @@ export interface MCPService {
   }
   env_vars?: Record<string, string> // Environment variables for stdio transport
   is_builtin?: boolean // Whether this is a builtin MCP service
+  // Who may reach this service. A public row owned by another workspace is
+  // usable here against that workspace's credentials, but the server strips its
+  // URL / headers / auth config and every write flag is false.
+  visibility?: 'private' | 'workspace' | 'public'
+  is_foreign?: boolean
+  can_edit?: boolean
+  can_delete?: boolean
+  can_share?: boolean
   // Per-field "configured?" map embedded on the main response (server-side
   // dto.MCPServiceResponse.Credentials). Drives the CredentialResource card
   // without a follow-up GET. Absent for builtin services.
@@ -141,6 +149,19 @@ export async function updateMCPService(id: string, data: Partial<MCPService>): P
 // Delete an MCP service
 export async function deleteMCPService(id: string): Promise<void> {
   await del(`/api/v1/mcp-services/${id}`)
+}
+
+/**
+ * Change only the visibility of a service. Separate from updateMCPService
+ * because that one re-submits connection settings and drops credentials when
+ * they are absent; this writes one column and never touches secrets.
+ */
+export async function setMCPServiceVisibility(
+  id: string,
+  visibility: 'private' | 'workspace' | 'public',
+): Promise<MCPService> {
+  const response: any = await put(`/api/v1/mcp-services/${id}/visibility`, { visibility })
+  return response.data
 }
 
 // Test MCP service connection

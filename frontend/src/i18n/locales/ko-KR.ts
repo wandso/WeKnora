@@ -3970,6 +3970,13 @@ export default {
     }
   },
   mcpSettings: {
+    visibility: '공개 범위',
+    visibilityPrivate: '나만',
+    visibilityWorkspace: '워크스페이스',
+    visibilityPublic: '공개',
+    visibilityUpdated: '공개 범위를 업데이트했습니다',
+    visibilityUpdateFailed: '공개 범위 업데이트에 실패했습니다',
+    foreignBadge: '다른 워크스페이스에서',
     addUsageInstructions: "사용 안내 추가",
     noUsageInstructions: "아직 사용 안내가 없습니다",
     title: 'MCP 서비스 관리',
@@ -7820,6 +7827,13 @@ export default {
       },
     },
     skills: {
+      visibility: '공개 범위',
+      visibilityPrivate: '나만',
+      visibilityWorkspace: '워크스페이스',
+      visibilityPublic: '공개',
+      visibilityUpdated: '공개 범위를 업데이트했습니다',
+      visibilityUpdateFailed: '공개 범위 업데이트에 실패했습니다',
+      foreignBadge: '다른 워크스페이스에서',
       governance: {
         categoryLabel: '기능 유형',
         riskLabel: '위험도',

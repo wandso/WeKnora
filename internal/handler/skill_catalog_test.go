@@ -230,3 +230,9 @@ func TestDeleteCatalogRefusesWhileInstalled(t *testing.T) {
 	router.ServeHTTP(w, httptest.NewRequest(http.MethodDelete, "/skills/catalog/cat-1", nil))
 	require.Equal(t, http.StatusConflict, w.Code)
 }
+
+func (f *fakeSkillCatalog) SetCatalogVisibility(
+	_ context.Context, _ uint64, _ string, visibility string,
+) (*types.TenantSkillCatalogEntity, error) {
+	return &types.TenantSkillCatalogEntity{ID: "catalog-1", Visibility: visibility}, nil
+}

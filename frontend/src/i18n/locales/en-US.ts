@@ -2433,6 +2433,13 @@ export default {
       },
     },
     skills: {
+      visibility: 'Visibility',
+      visibilityPrivate: 'Only me',
+      visibilityWorkspace: 'Workspace',
+      visibilityPublic: 'Public',
+      visibilityUpdated: 'Visibility updated',
+      visibilityUpdateFailed: 'Failed to update visibility',
+      foreignBadge: 'From another workspace',
       governance: {
         categoryLabel: 'Capability',
         riskLabel: 'Risk',
@@ -6183,6 +6190,13 @@ export default {
       }
     },
     mcpSettings: {
+      visibility: 'Visibility',
+      visibilityPrivate: 'Only me',
+      visibilityWorkspace: 'Workspace',
+      visibilityPublic: 'Public',
+      visibilityUpdated: 'Visibility updated',
+      visibilityUpdateFailed: 'Failed to update visibility',
+      foreignBadge: 'From another workspace',
       addUsageInstructions: "Add usage instructions",
       noUsageInstructions: "No usage instructions yet",
       title: 'MCP Services',

@@ -39,16 +39,55 @@
                 </div>
                 <h3 class="service-card__title" :title="service.name">{{ service.name }}</h3>
                 <span v-if="service.is_builtin" class="service-card__builtin">{{ $t('mcpSettings.builtin') }}</span>
-                <div v-if="authStore.hasRole('admin')" class="service-card__actions">
-                  <button type="button" class="service-card__icon-btn" :title="$t('common.edit')"
-                    :aria-label="`${service.name} · ${$t('common.edit')}`" @click="handleEdit(service)">
+                <span v-else-if="service.visibility && service.visibility !== 'workspace'"
+                  class="service-card__visibility" :class="{ 'is-public': service.visibility === 'public' }">
+                  {{ visibilityLabel(service) }}
+                </span>
+                <span v-if="service.is_foreign" class="service-card__visibility is-foreign">
+                  {{ $t('mcpSettings.foreignBadge') }}
+                </span>
+                <div v-if="canEditService(service) || canShareService(service) || canDeleteService(service)"
+                  class="service-card__actions">
+                  <button v-if="canEditService(service)" type="button" class="service-card__icon-btn"
+                    :title="$t('common.edit')" :aria-label="`${service.name} · ${$t('common.edit')}`"
+                    @click="handleEdit(service)">
                     <t-icon name="edit" size="14px" />
                   </button>
-                  <button v-if="!service.is_builtin" type="button" class="service-card__icon-btn service-card__icon-btn--danger"
-                    :disabled="togglingIds.has(service.id)" :title="$t('common.delete')"
-                    :aria-label="`${service.name} · ${$t('common.delete')}`" @click="handleDelete(service)">
-                    <t-icon name="delete" size="14px" />
-                  </button>
+                  <t-popup :visible="openMenuId === service.id"
+                    @visible-change="(visible: boolean) => setOpenMenu(service.id, visible)"
+                    overlayClassName="card-more-popup" trigger="click" destroy-on-close placement="bottom-right">
+                    <button type="button" class="service-card__icon-btn" :aria-label="$t('common.expand')"
+                      :aria-expanded="openMenuId === service.id" aria-haspopup="true">
+                      <t-icon name="ellipsis" size="14px" />
+                    </button>
+                    <template #content>
+                      <div class="popup-menu">
+                        <!-- Visibility is only offered where the server says it
+                             is allowed: builtin and foreign rows come back with
+                             can_share=false, so no branch is needed here. -->
+                        <template v-if="canShareService(service)">
+                          <div class="popup-menu-section-title">{{ $t('mcpSettings.visibility') }}</div>
+                          <div v-for="opt in VISIBILITY_OPTIONS" :key="opt.value" class="popup-menu-item visibility-option"
+                            :class="{ 'is-current': (service.visibility || 'workspace') === opt.value }"
+                            @click.stop="changeVisibility(service, opt.value)">
+                            <t-icon class="menu-icon"
+                              :name="(service.visibility || 'workspace') === opt.value ? 'check' : opt.icon" />
+                            <span>{{ $t(opt.labelKey) }}</span>
+                          </div>
+                          <div class="popup-menu-divider"></div>
+                        </template>
+                        <div v-if="canEditService(service)" class="popup-menu-item" @click="handleEdit(service)">
+                          <t-icon class="menu-icon" name="edit" />
+                          <span>{{ $t('common.edit') }}</span>
+                        </div>
+                        <div v-if="canDeleteService(service)" class="popup-menu-item delete"
+                          @click="handleDelete(service)">
+                          <t-icon class="menu-icon" name="delete" />
+                          <span>{{ $t('common.delete') }}</span>
+                        </div>
+                      </div>
+                    </template>
+                  </t-popup>
                 </div>
               </div>
               <p v-if="serviceUsage(service)" class="service-card__desc" :title="serviceUsage(service)">
@@ -131,6 +170,7 @@ import {
   listMCPServices,
   updateMCPService,
   deleteMCPService,
+  setMCPServiceVisibility,
   type MCPService
 } from '@/api/mcp-service'
 import McpServiceDialog from './components/McpServiceDialog.vue'
@@ -157,6 +197,60 @@ const currentService = ref<MCPService | null>(null)
 const dialogInitialStep = ref<0 | 1>(0)
 const togglingIds = ref(new Set<string>())
 const serviceUsage = (service: MCPService) => service.usage_instructions?.trim() || service.description?.trim() || ''
+
+// Same three levels and the same ordering as the knowledge base and mini tool
+// menus, so the four catalogs read alike.
+const VISIBILITY_OPTIONS: Array<{
+  value: 'private' | 'workspace' | 'public'
+  labelKey: string
+  icon: string
+}> = [
+  { value: 'private', labelKey: 'mcpSettings.visibilityPrivate', icon: 'lock-on' },
+  { value: 'workspace', labelKey: 'mcpSettings.visibilityWorkspace', icon: 'usergroup' },
+  { value: 'public', labelKey: 'mcpSettings.visibilityPublic', icon: 'earth' },
+]
+
+// Only one card menu is open at a time.
+const openMenuId = ref('')
+
+function setOpenMenu(id: string, visible: boolean) {
+  openMenuId.value = visible ? id : (openMenuId.value === id ? '' : openMenuId.value)
+}
+
+// The server computes these per request. The fallback keeps older responses
+// (field absent) behaving exactly as before this feature: admins manage
+// everything that is not builtin.
+function canEditService(service: MCPService) {
+  if (service.can_edit !== undefined) return service.can_edit
+  return authStore.hasRole('admin') && !service.is_builtin
+}
+
+function canDeleteService(service: MCPService) {
+  if (service.can_delete !== undefined) return service.can_delete
+  return authStore.hasRole('admin') && !service.is_builtin
+}
+
+function canShareService(service: MCPService) {
+  return service.can_share === true
+}
+
+function visibilityLabel(service: MCPService) {
+  if (service.visibility === 'public') return t('mcpSettings.visibilityPublic')
+  if (service.visibility === 'private') return t('mcpSettings.visibilityPrivate')
+  return t('mcpSettings.visibilityWorkspace')
+}
+
+async function changeVisibility(service: MCPService, visibility: 'private' | 'workspace' | 'public') {
+  openMenuId.value = ''
+  if ((service.visibility || 'workspace') === visibility) return
+  try {
+    await setMCPServiceVisibility(service.id, visibility)
+    MessagePlugin.success(t('mcpSettings.visibilityUpdated'))
+    await loadServices()
+  } catch (error) {
+    MessagePlugin.error(t('mcpSettings.visibilityUpdateFailed'))
+  }
+}
 const query = ref('')
 const filteredServices = computed(() => services.value.filter((service) =>
   matchesResourceQuery({ name: service.name, description: serviceUsage(service) }, query.value),
@@ -467,6 +561,29 @@ defineExpose({ openAdd: handleAdd })
   font-size: var(--app-text-sm);
   line-height: 1.35;
   color: var(--td-text-color-placeholder);
+}
+
+/* Visibility badge. Quiet by default because "workspace" is the unremarkable
+   case; public earns the accent because publishing a key is consequential. */
+.service-card__visibility {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: var(--app-text-xs);
+  line-height: 18px;
+  color: var(--td-text-color-secondary);
+  background: var(--td-bg-color-component);
+}
+
+.service-card__visibility.is-public {
+  color: var(--td-brand-color);
+  background: var(--td-brand-color-light);
+}
+
+.service-card__visibility.is-foreign {
+  color: var(--td-text-color-placeholder);
+  background: transparent;
+  border: 1px dashed var(--td-component-stroke);
 }
 
 .service-card__type {

@@ -3972,6 +3972,13 @@ export default {
     }
   },
   mcpSettings: {
+    visibility: '可见范围',
+    visibilityPrivate: '仅自己',
+    visibilityWorkspace: '空间共享',
+    visibilityPublic: '公开',
+    visibilityUpdated: '可见范围已更新',
+    visibilityUpdateFailed: '更新可见范围失败',
+    foreignBadge: '来自其他空间',
     addUsageInstructions: "添加使用说明",
     noUsageInstructions: "尚未填写使用说明",
     title: 'MCP 服务管理',
@@ -7821,6 +7828,13 @@ export default {
       },
     },
     skills: {
+      visibility: '可见范围',
+      visibilityPrivate: '仅自己',
+      visibilityWorkspace: '空间共享',
+      visibilityPublic: '公开',
+      visibilityUpdated: '可见范围已更新',
+      visibilityUpdateFailed: '更新可见范围失败',
+      foreignBadge: '来自其他空间',
       governance: {
         categoryLabel: '能力类型',
         riskLabel: '风险等级',

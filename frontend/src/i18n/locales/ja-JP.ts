@@ -2294,6 +2294,13 @@ export default {
       },
     },
     skills: {
+      visibility: '公開範囲',
+      visibilityPrivate: '自分のみ',
+      visibilityWorkspace: 'ワークスペース',
+      visibilityPublic: '公開',
+      visibilityUpdated: '公開範囲を更新しました',
+      visibilityUpdateFailed: '公開範囲の更新に失敗しました',
+      foreignBadge: '他のワークスペースから',
       governance: {
         categoryLabel: '機能タイプ',
         riskLabel: 'リスク',
@@ -6044,6 +6051,13 @@ export default {
       }
     },
     mcpSettings: {
+      visibility: '公開範囲',
+      visibilityPrivate: '自分のみ',
+      visibilityWorkspace: 'ワークスペース',
+      visibilityPublic: '公開',
+      visibilityUpdated: '公開範囲を更新しました',
+      visibilityUpdateFailed: '公開範囲の更新に失敗しました',
+      foreignBadge: '他のワークスペースから',
       addUsageInstructions: "使用方法を追加",
       noUsageInstructions: "使用方法は未入力です",
       title: 'MCPサービス',

@@ -26,6 +26,33 @@ const (
 // API key, token and custom headers along with the update.
 const MCPUpdateDropSecrets = "drop_secrets"
 
+// MCP service visibility. Same vocabulary as knowledge bases and mini tools.
+const (
+	MCPVisibilityPrivate   = "private"
+	MCPVisibilityWorkspace = "workspace"
+	MCPVisibilityPublic    = "public"
+)
+
+// NormalizeMCPVisibility maps anything unrecognised to workspace.
+//
+// Workspace is the historical audience for every existing row, so falling back
+// to it cannot silently narrow or widen what somebody can already reach.
+func NormalizeMCPVisibility(value string) string {
+	switch strings.TrimSpace(value) {
+	case MCPVisibilityPrivate:
+		return MCPVisibilityPrivate
+	case MCPVisibilityPublic:
+		return MCPVisibilityPublic
+	default:
+		return MCPVisibilityWorkspace
+	}
+}
+
+// IsPublicMCPService reports whether a service is shared across workspaces.
+func IsPublicMCPService(svc *MCPService) bool {
+	return svc != nil && NormalizeMCPVisibility(svc.Visibility) == MCPVisibilityPublic
+}
+
 // MCPService represents an MCP (Model Context Protocol) service configuration
 type MCPService struct {
 	// UsageInstructions is maintained locally and is not overwritten by directory refresh.
@@ -44,9 +71,26 @@ type MCPService struct {
 	StdioConfig    *MCPStdioConfig    `json:"stdio_config,omitempty" gorm:"type:json"`     // Required for stdio transport
 	EnvVars        MCPEnvVars         `json:"env_vars,omitempty"     gorm:"type:json"`     // Environment variables for stdio
 	IsBuiltin      bool               `json:"is_builtin"             gorm:"default:false"` // Whether this is a builtin MCP service (visible to all workspaces)
-	CreatedAt      time.Time          `json:"created_at"`
-	UpdatedAt      time.Time          `json:"updated_at"`
-	DeletedAt      gorm.DeletedAt     `json:"deleted_at"             gorm:"index"`
+	// Visibility is private (creator plus workspace Owner/Admin), workspace
+	// (all members) or public (usable from every workspace, against this
+	// workspace's credentials — the credentials themselves are never returned
+	// to a caller outside this workspace).
+	Visibility string `json:"visibility" gorm:"type:varchar(16);not null;default:'workspace'"`
+	// CreatedBy backs the "private" level. Empty for rows predating the column;
+	// private then falls back to workspace Owner/Admin only.
+	CreatedBy string         `json:"created_by,omitempty" gorm:"type:varchar(36);not null;default:''"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `json:"deleted_at"             gorm:"index"`
+
+	// Per-request permission flags, never persisted. See decorateMCPService.
+	CanEdit   bool `json:"can_edit" gorm:"-"`
+	CanDelete bool `json:"can_delete" gorm:"-"`
+	CanShare  bool `json:"can_share" gorm:"-"`
+	// IsForeign marks a row that belongs to another workspace and is visible
+	// only because it is public. The UI labels it instead of pretending it is
+	// local, and every write flag is false.
+	IsForeign bool `json:"is_foreign" gorm:"-"`
 }
 
 // EffectiveUsageInstructions preserves documentation on legacy services until

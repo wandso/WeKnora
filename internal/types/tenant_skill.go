@@ -3,6 +3,7 @@ package types
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -235,6 +236,33 @@ type TenantSkillSnapshotEntity struct {
 // TableName pins the table so GORM's pluralizer cannot drift.
 func (e *TenantSkillSnapshotEntity) TableName() string { return "tenant_skill_snapshots" }
 
+// Skill catalogue visibility. Same vocabulary as knowledge bases, mini tools
+// and MCP services; see migrations/versioned/000140 for what "public" means
+// here (discoverable and installable, not executable across workspaces).
+const (
+	SkillVisibilityPrivate   = "private"
+	SkillVisibilityWorkspace = "workspace"
+	SkillVisibilityPublic    = "public"
+)
+
+// NormalizeSkillVisibility maps anything unrecognised to workspace, which is
+// the audience every existing row already had.
+func NormalizeSkillVisibility(value string) string {
+	switch strings.TrimSpace(value) {
+	case SkillVisibilityPrivate:
+		return SkillVisibilityPrivate
+	case SkillVisibilityPublic:
+		return SkillVisibilityPublic
+	default:
+		return SkillVisibilityWorkspace
+	}
+}
+
+// IsPublicSkillCatalog reports whether a definition is shared across workspaces.
+func IsPublicSkillCatalog(e *TenantSkillCatalogEntity) bool {
+	return e != nil && NormalizeSkillVisibility(e.Visibility) == SkillVisibilityPublic
+}
+
 // TenantSkillCatalogEntity is one workspace skill definition. It does not
 // belong to a sandbox: installations onto a config's image are TenantSkillEntity
 // rows that point back here.
@@ -249,9 +277,15 @@ type TenantSkillCatalogEntity struct {
 	// do not own a copy: sandbox uninstall must not delete this object.
 	BundleRef    string `gorm:"type:varchar(1024)"`
 	BundleSHA256 string `gorm:"type:varchar(64)"`
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	DeletedAt    gorm.DeletedAt
+	// Visibility decides who may discover the definition. Installation always
+	// happens into the caller's own sandbox: a public skill is a definition
+	// other workspaces can install, never one that runs across workspaces.
+	Visibility string `gorm:"type:varchar(16);not null;default:'workspace'"`
+	// CreatedBy backs the "private" level. Empty for rows predating the column.
+	CreatedBy string `gorm:"type:varchar(36);not null;default:''"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt gorm.DeletedAt
 }
 
 // TableName pins the table so GORM's pluralizer cannot drift.

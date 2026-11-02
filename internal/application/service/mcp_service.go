@@ -8,6 +8,7 @@ import (
 	"slices"
 	"time"
 
+	apperrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/mcp"
 	"github.com/Tencent/WeKnora/internal/types"
@@ -35,7 +36,13 @@ func NewMCPServiceService(
 	}
 }
 
-// CreateMCPService creates a new MCP service
+// CreateMCPService creates a new MCP service.
+//
+// The request body is bound straight onto this entity by the handler, so every
+// field a client must not choose is cleared here rather than trusted: a caller
+// could otherwise create a row with is_builtin=true (un-editable, un-deletable
+// and visible everywhere), hand-pick its id, or publish it to the whole
+// deployment in one POST.
 func (s *mcpServiceService) CreateMCPService(ctx context.Context, service *types.MCPService) error {
 	// Stdio transport is disabled for security reasons
 	if service.TransportType == types.MCPTransportStdio {
@@ -44,6 +51,14 @@ func (s *mcpServiceService) CreateMCPService(ctx context.Context, service *types
 	if err := mcp.ValidateServiceOutboundURLs(service); err != nil {
 		return err
 	}
+
+	service.ID = ""
+	service.IsBuiltin = false
+	service.CreatedBy, _ = types.UserIDFromContext(ctx)
+	// New services start at the workspace level. Sharing is a separate,
+	// audited action (SetMCPVisibility) rather than a create-time flag, which
+	// matches how the knowledge base and mini tool menus behave.
+	service.Visibility = types.MCPVisibilityWorkspace
 
 	// Set default advanced config if not provided
 	if service.AdvancedConfig == nil {
@@ -59,7 +74,140 @@ func (s *mcpServiceService) CreateMCPService(ctx context.Context, service *types
 		return fmt.Errorf("failed to create MCP service: %w", err)
 	}
 
+	// The handler serialises this same entity, so the permission flags have to
+	// be filled here or the freshly created card would come back with every
+	// affordance hidden.
+	userID, _ := types.UserIDFromContext(ctx)
+	decorateMCPService(service, service.TenantID, userID, types.TenantRoleFromContext(ctx))
 	return nil
+}
+
+// requireOwnedMCP gates every write path on ownership.
+//
+// GetByID now also resolves public rows from other workspaces, so "found" no
+// longer implies "mine". Without this check a reader in workspace B could
+// rename a service published by workspace A — the entity the update carries
+// still points at the owning tenant, so the repository's WHERE clause matched
+// the owner's row and the write went through. Delete returned 200 with no
+// effect for the opposite reason: its predicate matched nothing and GORM does
+// not treat zero rows as an error.
+func requireOwnedMCP(existing *types.MCPService, tenantID uint64) error {
+	if existing == nil {
+		return apperrors.NewNotFoundError("MCP service not found")
+	}
+	if tenantID == 0 || existing.TenantID != tenantID {
+		return apperrors.NewForbiddenError("this MCP service belongs to another workspace")
+	}
+	return nil
+}
+
+// canManageMCPService reports whether the caller may edit or delete a service.
+//
+// tenantID is the caller's workspace and is checked first. A public row is
+// reachable from anywhere, so without this a reader who happens to be Owner of
+// their own workspace would pass the role test below and be handed write access
+// to somebody else's service. Builtin rows are never manageable: they ship with
+// the product and the next release would overwrite the edit.
+func canManageMCPService(svc *types.MCPService, tenantID uint64, userID string, role types.TenantRole) bool {
+	if svc == nil || svc.IsBuiltin {
+		return false
+	}
+	if tenantID == 0 || svc.TenantID != tenantID {
+		return false
+	}
+	if role == types.TenantRoleOwner || role == types.TenantRoleAdmin {
+		return true
+	}
+	return userID != "" && svc.CreatedBy != "" && svc.CreatedBy == userID
+}
+
+// canShareMCPService reports whether the caller may change a service's
+// visibility. Looser than canManageMCPService only in that it does not require
+// the caller to be the creator: sharing is a workspace-level decision, so any
+// Owner/Admin of the owning workspace may take it.
+func canShareMCPService(svc *types.MCPService, tenantID uint64, userID string, role types.TenantRole) bool {
+	if svc == nil || svc.IsBuiltin {
+		return false
+	}
+	if tenantID == 0 || svc.TenantID != tenantID {
+		return false
+	}
+	if role == types.TenantRoleOwner || role == types.TenantRoleAdmin {
+		return true
+	}
+	return userID != "" && svc.CreatedBy != "" && svc.CreatedBy == userID
+}
+
+// decorateMCPService fills the per-request permission flags the UI renders.
+//
+// Pure decoration: it never touches the credential fields, so it is safe to run
+// on the runtime lookup path as well as on the settings page.
+func decorateMCPService(svc *types.MCPService, tenantID uint64, userID string, role types.TenantRole) {
+	if svc == nil {
+		return
+	}
+	svc.IsForeign = tenantID != 0 && svc.TenantID != tenantID
+	svc.CanEdit = canManageMCPService(svc, tenantID, userID, role)
+	svc.CanDelete = svc.CanEdit
+	svc.CanShare = canShareMCPService(svc, tenantID, userID, role)
+	if svc.IsForeign {
+		// A published service is usable and readable from here, never writable:
+		// its credentials belong to the workspace that published it.
+		svc.CanEdit = false
+		svc.CanDelete = false
+		svc.CanShare = false
+	}
+}
+
+func decorateMCPServices(services []*types.MCPService, ctx context.Context, tenantID uint64) {
+	userID, _ := types.UserIDFromContext(ctx)
+	role := types.TenantRoleFromContext(ctx)
+	for _, svc := range services {
+		decorateMCPService(svc, tenantID, userID, role)
+	}
+}
+
+// SetMCPVisibility publishes, restricts or un-publishes a service.
+//
+// Deliberately narrower than UpdateMCPService: it writes one column, so it
+// cannot accidentally rewrite credentials that changed concurrently, and it
+// stays valid for rows whose connection settings the caller does not have to
+// re-submit.
+func (s *mcpServiceService) SetMCPVisibility(
+	ctx context.Context, callerTenantID uint64, id string, visibility string,
+) (*types.MCPService, error) {
+	switch visibility {
+	case types.MCPVisibilityPrivate, types.MCPVisibilityWorkspace, types.MCPVisibilityPublic:
+	default:
+		return nil, apperrors.NewValidationError("visibility must be private, workspace or public")
+	}
+
+	existing, err := s.mcpServiceRepo.GetByID(ctx, callerTenantID, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get MCP service: %w", err)
+	}
+	if existing == nil {
+		return nil, apperrors.NewNotFoundError("MCP service not found")
+	}
+	if existing.IsBuiltin {
+		return nil, apperrors.NewValidationError(
+			"builtin MCP services are already visible to every workspace")
+	}
+	if callerTenantID == 0 || existing.TenantID != callerTenantID {
+		return nil, apperrors.NewForbiddenError("you cannot change the visibility of this MCP service")
+	}
+	userID, _ := types.UserIDFromContext(ctx)
+	role := types.TenantRoleFromContext(ctx)
+	if !canShareMCPService(existing, callerTenantID, userID, role) {
+		return nil, apperrors.NewForbiddenError("you cannot change the visibility of this MCP service")
+	}
+
+	if err := s.mcpServiceRepo.SetVisibility(ctx, callerTenantID, id, visibility); err != nil {
+		return nil, fmt.Errorf("failed to set MCP visibility: %w", err)
+	}
+	existing.Visibility = visibility
+	decorateMCPService(existing, callerTenantID, userID, role)
+	return existing, nil
 }
 
 // GetMCPServiceByID retrieves an MCP service by ID.
@@ -83,6 +231,8 @@ func (s *mcpServiceService) GetMCPServiceByID(
 	if service == nil {
 		return nil, fmt.Errorf("MCP service not found")
 	}
+	userID, _ := types.UserIDFromContext(ctx)
+	decorateMCPService(service, tenantID, userID, types.TenantRoleFromContext(ctx))
 	return service, nil
 }
 
@@ -96,6 +246,7 @@ func (s *mcpServiceService) ListMCPServices(ctx context.Context, tenantID uint64
 		logger.GetLogger(ctx).Errorf("Failed to list MCP services: %v", err)
 		return nil, fmt.Errorf("failed to list MCP services: %w", err)
 	}
+	decorateMCPServices(services, ctx, tenantID)
 	return services, nil
 }
 
@@ -131,6 +282,13 @@ func (s *mcpServiceService) UpdateMCPService(
 	}
 	if existing == nil {
 		return fmt.Errorf("MCP service not found")
+	}
+
+	// This path has no explicit tenantID argument: the handler stamps the
+	// caller's workspace onto the entity, so that is what ownership is checked
+	// against.
+	if err := requireOwnedMCP(existing, service.TenantID); err != nil {
+		return err
 	}
 
 	// Builtin MCP services cannot be updated
@@ -354,6 +512,10 @@ func (s *mcpServiceService) DeleteMCPService(ctx context.Context, tenantID uint6
 		return fmt.Errorf("MCP service not found")
 	}
 
+	if err := requireOwnedMCP(existing, tenantID); err != nil {
+		return err
+	}
+
 	// Builtin MCP services cannot be deleted
 	if existing.IsBuiltin {
 		return fmt.Errorf("builtin MCP services cannot be deleted")
@@ -528,6 +690,9 @@ func (s *mcpServiceService) UpdateMCPCredentials(
 	if existing == nil {
 		return nil, fmt.Errorf("MCP service not found")
 	}
+	if err := requireOwnedMCP(existing, tenantID); err != nil {
+		return nil, err
+	}
 	if existing.IsBuiltin {
 		return nil, fmt.Errorf("builtin MCP services cannot have credentials modified")
 	}
@@ -577,6 +742,9 @@ func (s *mcpServiceService) ClearMCPCredential(
 	}
 	if existing == nil {
 		return fmt.Errorf("MCP service not found")
+	}
+	if err := requireOwnedMCP(existing, tenantID); err != nil {
+		return err
 	}
 	if existing.IsBuiltin {
 		return fmt.Errorf("builtin MCP services cannot have credentials modified")

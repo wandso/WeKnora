@@ -73,6 +73,16 @@ type SkillCatalogView struct {
 	RiskLevel  string   `json:"risk_level"`
 	Keywords   []string `json:"keywords,omitempty"`
 	PromptHint string   `json:"prompt_hint,omitempty"`
+
+	// Visibility decides who may discover and install this definition.
+	Visibility string `json:"visibility"`
+	// IsForeign marks a definition owned by another workspace and visible only
+	// because it is public. Such a row can be read and installed into the
+	// caller's own sandbox, never edited, deleted or re-shared from here.
+	IsForeign bool `json:"is_foreign"`
+	CanEdit   bool `json:"can_edit"`
+	CanDelete bool `json:"can_delete"`
+	CanShare  bool `json:"can_share"`
 }
 
 // ListCatalog returns every workspace skill definition and which sandbox
@@ -80,6 +90,10 @@ type SkillCatalogView struct {
 func (s *TenantSkillService) ListCatalog(
 	ctx context.Context, tenantID uint64,
 ) ([]SkillCatalogView, error) {
+	caller := skillCallerFrom(ctx)
+	if caller.tenantID == 0 {
+		caller.tenantID = tenantID
+	}
 	catalogs, err := s.skills.ListCatalogsByTenant(ctx, tenantID)
 	if err != nil {
 		return nil, err
@@ -128,7 +142,7 @@ func (s *TenantSkillService) ListCatalog(
 		}
 		seenName[cat.Name] = struct{}{}
 		seenCatalog[cat.ID] = struct{}{}
-		out = append(out, catalogView(cat, byCatalog[cat.ID], configByID))
+		out = append(out, catalogView(cat, byCatalog[cat.ID], configByID, caller))
 	}
 	// Installs whose catalog row was deleted (or never existed) would otherwise
 	// vanish: they are not unattached (catalog_id is set) and they are not
@@ -157,7 +171,7 @@ func (s *TenantSkillService) ListCatalog(
 			Description: row.Description, BundleSHA256: row.BundleSHA256,
 			CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 		}
-		out = append(out, catalogView(synthetic, []*types.TenantSkillEntity{row}, configByID))
+		out = append(out, catalogView(synthetic, []*types.TenantSkillEntity{row}, configByID, caller))
 	}
 	for i := range out {
 		for _, install := range out[i].Installations {
@@ -166,14 +180,65 @@ func (s *TenantSkillService) ListCatalog(
 			}
 		}
 	}
+
+	// Definitions other workspaces published. They carry no installations of
+	// ours (an install row is created only when this workspace installs it), so
+	// the card renders as "not installed yet, available to install". A name
+	// clash with a local definition is expected — names are unique per
+	// workspace, not globally — and the foreign badge distinguishes them.
+	publics, err := s.skills.ListPublicCatalogs(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	for _, cat := range publics {
+		if cat == nil {
+			continue
+		}
+		out = append(out, catalogView(cat, nil, configByID, caller))
+	}
 	return out, nil
+}
+
+// skillCaller is who is asking. Skill definitions carry a creator and a
+// visibility, so the view needs the caller's identity, not just the tenant.
+type skillCaller struct {
+	tenantID uint64
+	userID   string
+	role     types.TenantRole
+}
+
+func skillCallerFrom(ctx context.Context) skillCaller {
+	tenantID, _ := types.TenantIDFromContext(ctx)
+	userID, _ := types.UserIDFromContext(ctx)
+	return skillCaller{tenantID: tenantID, userID: userID, role: types.TenantRoleFromContext(ctx)}
+}
+
+// canManageSkillCatalog: the owning workspace's Owner/Admin, or the creator.
+//
+// Mirrors canShareMiniTool. A definition owned by another workspace is never
+// manageable here, however public it is — installing it is the only operation
+// that makes sense, and that produces a row in the caller's own workspace.
+func canManageSkillCatalog(cat *types.TenantSkillCatalogEntity, c skillCaller) bool {
+	if cat == nil {
+		return false
+	}
+	if c.tenantID == 0 || cat.TenantID != c.tenantID {
+		return false
+	}
+	if c.role == types.TenantRoleOwner || c.role == types.TenantRoleAdmin {
+		return true
+	}
+	return c.userID != "" && cat.CreatedBy != "" && cat.CreatedBy == c.userID
 }
 
 func catalogView(
 	cat *types.TenantSkillCatalogEntity,
 	installs []*types.TenantSkillEntity,
 	configByID map[string]*types.TenantSandboxConfigEntity,
+	caller skillCaller,
 ) SkillCatalogView {
+	manage := canManageSkillCatalog(cat, caller)
+	foreign := caller.tenantID != 0 && cat.TenantID != caller.tenantID
 	view := SkillCatalogView{
 		ID:            cat.ID,
 		Name:          cat.Name,
@@ -183,6 +248,11 @@ func catalogView(
 		CreatedAt:     cat.CreatedAt,
 		UpdatedAt:     cat.UpdatedAt,
 		Installations: make([]SkillCatalogInstallView, 0, len(installs)),
+		Visibility:    types.NormalizeSkillVisibility(cat.Visibility),
+		IsForeign:     foreign,
+		CanEdit:       manage && !foreign,
+		CanDelete:     manage && !foreign,
+		CanShare:      manage && !foreign,
 	}
 	for _, row := range installs {
 		view.Installations = append(view.Installations, installView(row, configByID))
@@ -341,7 +411,12 @@ func (s *TenantSkillService) InstallCatalogToConfigs(
 	if err != nil {
 		return nil, err
 	}
-	archive, err := s.catalogBundleArchive(ctx, tenantID, catalog)
+	// The archive lives under the OWNING workspace's storage prefix. For a
+	// public definition from another workspace, reading it with the caller's
+	// tenant would miss the object (or, worse, pick up an unrelated one at the
+	// same relative path). Installing still happens into the caller's own
+	// configs below, which is what keeps the executable copy local.
+	archive, err := s.catalogBundleArchive(ctx, catalog.TenantID, catalog)
 	if err != nil {
 		return nil, err
 	}
@@ -390,6 +465,11 @@ func (s *TenantSkillService) DeleteCatalog(
 	if catalog == nil {
 		return apperrors.NewNotFoundError("skill not found")
 	}
+	// GetCatalog now also resolves public definitions from other workspaces;
+	// deleting one is not ours to do.
+	if catalog.TenantID != tenantID {
+		return apperrors.NewForbiddenError("this skill belongs to another workspace")
+	}
 	installs, err := s.skills.ListSkillsByCatalog(ctx, tenantID, catalogID)
 	if err != nil {
 		return err
@@ -409,6 +489,41 @@ func (s *TenantSkillService) DeleteCatalog(
 		s.deleteBundleBestEffort(ctx, tenantID, ref)
 	}
 	return nil
+}
+
+// SetCatalogVisibility publishes or restricts a definition.
+//
+// Only discovery changes: installations already built into a sandbox image are
+// untouched, and a workspace that already installed a now-private skill keeps
+// running it. That is deliberate — pulling files out of a live image is a
+// snapshot rebuild, not a metadata edit.
+func (s *TenantSkillService) SetCatalogVisibility(
+	ctx context.Context, callerTenantID uint64, catalogID string, visibility string,
+) (*types.TenantSkillCatalogEntity, error) {
+	switch visibility {
+	case types.SkillVisibilityPrivate, types.SkillVisibilityWorkspace, types.SkillVisibilityPublic:
+	default:
+		return nil, apperrors.NewBadRequestError("visibility must be private, workspace or public")
+	}
+
+	catalog, err := s.skills.GetCatalog(ctx, callerTenantID, catalogID)
+	if err != nil {
+		return nil, err
+	}
+	if catalog == nil {
+		return nil, apperrors.NewNotFoundError("skill not found")
+	}
+	if catalog.TenantID != callerTenantID {
+		return nil, apperrors.NewForbiddenError("this skill belongs to another workspace")
+	}
+	if !canManageSkillCatalog(catalog, skillCallerFrom(ctx)) {
+		return nil, apperrors.NewForbiddenError("you cannot change the visibility of this skill")
+	}
+	if err := s.skills.SetCatalogVisibility(ctx, callerTenantID, catalogID, visibility); err != nil {
+		return nil, err
+	}
+	catalog.Visibility = visibility
+	return catalog, nil
 }
 
 func (s *TenantSkillService) upsertCatalogFromBundle(
@@ -450,11 +565,18 @@ func (s *TenantSkillService) upsertCatalogFromBundle(
 		return existing, nil
 	}
 
+	userID, _ := types.UserIDFromContext(ctx)
 	row := &types.TenantSkillCatalogEntity{
 		ID: uuid.NewString(), TenantID: tenantID, Name: bundle.Name,
 		Version: bundle.Version, Description: bundle.Description,
 		Instructions: bundle.Instructions,
-		CreatedAt:    now, UpdatedAt: now,
+		// Recorded so "private" has somebody to mean. A definition registered
+		// by an API key has no user id; it then falls back to Owner/Admin only,
+		// which is the safe direction for a private row.
+		CreatedBy: userID,
+		// Uploads start at the workspace level; sharing is a separate action.
+		Visibility: types.SkillVisibilityWorkspace,
+		CreatedAt:  now, UpdatedAt: now,
 	}
 	stored, _, err := s.storeCatalogBundle(ctx, tenantID, row, archive, requireStore)
 	if err != nil {
@@ -754,7 +876,9 @@ func (s *TenantSkillService) loadCatalogArchive(
 	if err != nil {
 		return nil, err
 	}
-	return s.catalogBundleArchive(ctx, tenantID, catalog)
+	// Use the owning workspace's prefix: a public definition from another
+	// workspace keeps its archive there.
+	return s.catalogBundleArchive(ctx, catalog.TenantID, catalog)
 }
 
 func (s *TenantSkillService) catalogBundleArchive(

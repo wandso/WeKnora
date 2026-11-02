@@ -552,7 +552,7 @@ func (h *MCPServiceHandler) UpdateMCPService(c *gin.Context) {
 
 	if err := h.mcpServiceService.UpdateMCPService(ctx, &service, updateFields); err != nil {
 		logger.ErrorWithFields(ctx, err, map[string]interface{}{"service_id": secutils.SanitizeForLog(serviceID)})
-		c.Error(errors.NewInternalServerError("Failed to update MCP service: " + err.Error()))
+		h.failServiceCall(c, err, "Failed to update MCP service")
 		return
 	}
 
@@ -628,7 +628,7 @@ func (h *MCPServiceHandler) DeleteMCPService(c *gin.Context) {
 
 	if err := h.mcpServiceService.DeleteMCPService(ctx, tenantID, serviceID); err != nil {
 		logger.ErrorWithFields(ctx, err, map[string]interface{}{"service_id": secutils.SanitizeForLog(serviceID)})
-		c.Error(errors.NewInternalServerError("Failed to delete MCP service: " + err.Error()))
+		h.failServiceCall(c, err, "Failed to delete MCP service")
 		return
 	}
 
@@ -636,6 +636,74 @@ func (h *MCPServiceHandler) DeleteMCPService(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "MCP service deleted successfully",
+	})
+}
+
+// failServiceCall maps an AppError from the service layer onto its real status
+// code. The MCP service layer historically returned bare errors, so handlers
+// blanket-mapped everything to 500; ownership violations are 403 and belong in
+// that shape, not in a server error.
+func (h *MCPServiceHandler) failServiceCall(c *gin.Context, err error, fallback string) {
+	var appErr *errors.AppError
+	if stderrors.As(err, &appErr) {
+		c.Error(appErr)
+		return
+	}
+	c.Error(errors.NewInternalServerError(fallback + ": " + err.Error()))
+}
+
+// SetMCPVisibility godoc
+// @Summary      设置MCP服务可见范围
+// @Description  修改MCP服务的可见范围（私有/工作区/公开），不修改连接配置与凭据。仅服务所属工作区的管理员或创建者可调用。
+// @Tags         MCP服务
+// @Accept       json
+// @Produce      json
+// @Param        id       path      string  true  "MCP服务ID"  extensions(x-agent=mcp_service_id)
+// @Param        request  body      object  true  "可见范围"
+// @Success      200      {object}  handler.DataResponse{data=dto.MCPServiceResponse}
+// @Failure      400      {object}  errors.AppError
+// @Failure      403      {object}  errors.AppError
+// @Failure      404      {object}  errors.AppError
+// @Security     ApiKeyAuth
+// @Router       /mcp-services/{id}/visibility [put]
+func (h *MCPServiceHandler) SetMCPVisibility(c *gin.Context) {
+	ctx := c.Request.Context()
+	serviceID := secutils.SanitizeForLog(c.Param("id"))
+
+	// The caller's own workspace, not the one a guard may have rewritten for
+	// the request: visibility is decided by the workspace that owns the row.
+	tenantID := c.GetUint64(types.TenantIDContextKey.String())
+	if tenantID == 0 {
+		logger.Error(ctx, "Tenant ID is empty")
+		c.Error(errors.NewBadRequestError("Workspace ID cannot be empty"))
+		return
+	}
+
+	var req struct {
+		Visibility string `json:"visibility"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(errors.NewBadRequestError("Invalid request data").WithDetails(err.Error()))
+		return
+	}
+
+	service, err := h.mcpServiceService.SetMCPVisibility(ctx, tenantID, serviceID, req.Visibility)
+	if err != nil {
+		var appErr *errors.AppError
+		if stderrors.As(err, &appErr) {
+			c.Error(appErr)
+			return
+		}
+		logger.ErrorWithFields(ctx, err, map[string]interface{}{
+			"service_id": secutils.SanitizeForLog(serviceID),
+		})
+		c.Error(errors.NewInternalServerError("Failed to set MCP service visibility"))
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    h.mcpServiceResponses(ctx, tenantID, []*types.MCPService{service})[0],
 	})
 }
 

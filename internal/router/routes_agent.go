@@ -95,6 +95,11 @@ func RegisterSkillRoutes(r *gin.RouterGroup, skillHandler *handler.SkillHandler,
 		catalogWrite.GET("/:id/files", g.Admin(), skillHandler.ListCatalogFiles)
 		catalogWrite.GET("/:id/files/content", g.Admin(), skillHandler.GetCatalogFile)
 		catalogWrite.DELETE("/:id", g.Admin(), skillHandler.DeleteCatalog)
+		// Visibility is metadata only — it never touches an image — but it
+		// sits in the write group because it is a workspace policy decision.
+		// The service layer separately requires the row to belong to the
+		// caller's workspace.
+		catalogWrite.PUT("/:id/visibility", g.Admin(), skillHandler.SetCatalogVisibility)
 	}
 }
 
