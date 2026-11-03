@@ -1269,12 +1269,47 @@
               <label>{{ $t('agentEditor.mcp.selectLabel') }}</label>
               <p class="desc">{{ $t('agentEditor.mcp.selectDesc') }}</p>
             </div>
-            <div class="setting-control">
+            <div class="setting-control setting-control-stack">
+              <div class="pick-filter">
+                <t-input
+                  v-model="mcpQuery"
+                  class="pick-filter__input"
+                  clearable
+                  :placeholder="$t('agentEditor.filter.mcpPlaceholder')"
+                >
+                  <template #prefix-icon><t-icon name="search" /></template>
+                </t-input>
+                <label
+                  class="pick-mode"
+                  :title="degradeMatch ? $t('agentEditor.filter.degradeHintOn') : $t('agentEditor.filter.degradeHintOff')"
+                >
+                  <input v-model="degradeMatch" type="checkbox" class="pick-mode__input" />
+                  <span class="pick-mode__track" aria-hidden="true"><span class="pick-mode__thumb" /></span>
+                  <span class="pick-mode__text">
+                    {{ degradeMatch ? $t('agentEditor.filter.degradeOn') : $t('agentEditor.filter.degradeOff') }}
+                  </span>
+                </label>
+                <span class="pick-filter__count">
+                  {{ $t('agentEditor.filter.count', { matched: mcpMatches.length, total: mcpOptions.length }) }}
+                </span>
+              </div>
               <t-select v-model="formData.config.mcp_services" multiple
                 :placeholder="$t('agentEditor.mcp.selectPlaceholder')" filterable>
-                <t-option v-for="mcp in mcpOptions" :key="mcp.value" :value="mcp.value" :label="mcp.label"
+                <t-option v-for="mcp in filteredMcpOptions" :key="mcp.value" :value="mcp.value" :label="mcp.label"
                   :disabled="mcp.disabled" />
               </t-select>
+              <p v-if="mcpNoMatch" class="pick-filter__empty">
+                <span>{{ $t('agentEditor.filter.empty', { query: mcpQuery.trim() }) }}</span>
+                <template v-if="!degradeMatch">
+                  <a href="javascript:void(0)" class="go-settings-link" @click.prevent="degradeMatch = true">
+                    {{ $t('agentEditor.filter.tryDegrade') }}
+                  </a>
+                  <span class="pick-filter__sep" aria-hidden="true">·</span>
+                </template>
+                <a href="javascript:void(0)" class="go-settings-link" @click.prevent="mcpQuery = ''">
+                  {{ $t('agentEditor.filter.reset') }}
+                </a>
+              </p>
             </div>
           </div>
 
@@ -1395,13 +1430,36 @@
           </div>
 
           <div v-if="showCatalogSkillList" class="setting-row setting-row-vertical">
-            <div class="setting-control setting-control-full">
+            <div class="setting-control setting-control-full setting-control-stack">
+              <div class="pick-filter">
+                <t-input
+                  v-model="skillsQuery"
+                  class="pick-filter__input"
+                  clearable
+                  :placeholder="$t('agentEditor.filter.skillsPlaceholder')"
+                >
+                  <template #prefix-icon><t-icon name="search" /></template>
+                </t-input>
+                <label
+                  class="pick-mode"
+                  :title="degradeMatch ? $t('agentEditor.filter.degradeHintOn') : $t('agentEditor.filter.degradeHintOff')"
+                >
+                  <input v-model="degradeMatch" type="checkbox" class="pick-mode__input" />
+                  <span class="pick-mode__track" aria-hidden="true"><span class="pick-mode__thumb" /></span>
+                  <span class="pick-mode__text">
+                    {{ degradeMatch ? $t('agentEditor.filter.degradeOn') : $t('agentEditor.filter.degradeOff') }}
+                  </span>
+                </label>
+                <span class="pick-filter__count">
+                  {{ $t('agentEditor.filter.count', { matched: skillsMatchCount, total: catalogSkillRows.length }) }}
+                </span>
+              </div>
               <t-checkbox-group
                 v-model="formData.config.selected_skills"
-                class="skill-pick-list"
+                class="skill-pick-list skill-pick-list--scroll"
               >
                 <section
-                  v-for="group in catalogSkillGroups"
+                  v-for="group in filteredCatalogSkillGroups"
                   :key="group.key"
                   class="skill-pick-group"
                   :class="`skill-pick-group--${group.key}`"
@@ -1503,6 +1561,19 @@
                   </article>
                 </section>
               </t-checkbox-group>
+              <div v-if="skillsNoMatch" class="pick-empty">
+                <t-icon name="search" size="18px" />
+                <span>{{ $t('agentEditor.filter.empty', { query: skillsQuery.trim() }) }}</span>
+                <div class="pick-empty__actions">
+                  <t-button v-if="!degradeMatch" size="small" variant="outline" theme="primary"
+                    @click="degradeMatch = true">
+                    {{ $t('agentEditor.filter.tryDegrade') }}
+                  </t-button>
+                  <t-button size="small" variant="text" theme="primary" @click="skillsQuery = ''">
+                    {{ $t('agentEditor.filter.reset') }}
+                  </t-button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1540,9 +1611,33 @@
 
           <div v-if="miniToolsSelectionMode === 'selected' && miniToolOptions.length > 0"
             class="setting-row setting-row-vertical">
-            <div class="setting-control setting-control-full">
-              <t-checkbox-group v-model="formData.config.selected_mini_tools" class="skill-pick-list">
-                <section v-for="group in miniToolGroups" :key="group.key" class="skill-pick-group">
+            <div class="setting-control setting-control-full setting-control-stack">
+              <div class="pick-filter">
+                <t-input
+                  v-model="miniToolsQuery"
+                  class="pick-filter__input"
+                  clearable
+                  :placeholder="$t('agentEditor.filter.miniToolsPlaceholder')"
+                >
+                  <template #prefix-icon><t-icon name="search" /></template>
+                </t-input>
+                <label
+                  class="pick-mode"
+                  :title="degradeMatch ? $t('agentEditor.filter.degradeHintOn') : $t('agentEditor.filter.degradeHintOff')"
+                >
+                  <input v-model="degradeMatch" type="checkbox" class="pick-mode__input" />
+                  <span class="pick-mode__track" aria-hidden="true"><span class="pick-mode__thumb" /></span>
+                  <span class="pick-mode__text">
+                    {{ degradeMatch ? $t('agentEditor.filter.degradeOn') : $t('agentEditor.filter.degradeOff') }}
+                  </span>
+                </label>
+                <span class="pick-filter__count">
+                  {{ $t('agentEditor.filter.count', { matched: miniToolsMatchCount, total: miniToolOptions.length }) }}
+                </span>
+              </div>
+              <t-checkbox-group v-model="formData.config.selected_mini_tools"
+                class="skill-pick-list skill-pick-list--scroll">
+                <section v-for="group in filteredMiniToolGroups" :key="group.key" class="skill-pick-group">
                   <header class="skill-pick-group__header">
                     <span class="skill-pick-group__bar" />
                     <span class="skill-pick-group__title">{{ group.label }}</span>
@@ -1563,6 +1658,19 @@
                   </article>
                 </section>
               </t-checkbox-group>
+              <div v-if="miniToolsNoMatch" class="pick-empty">
+                <t-icon name="search" size="18px" />
+                <span>{{ $t('agentEditor.filter.empty', { query: miniToolsQuery.trim() }) }}</span>
+                <div class="pick-empty__actions">
+                  <t-button v-if="!degradeMatch" size="small" variant="outline" theme="primary"
+                    @click="degradeMatch = true">
+                    {{ $t('agentEditor.filter.tryDegrade') }}
+                  </t-button>
+                  <t-button size="small" variant="text" theme="primary" @click="miniToolsQuery = ''">
+                    {{ $t('agentEditor.filter.reset') }}
+                  </t-button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1976,6 +2084,7 @@ import {
 import { type ModelConfig } from '@/api/model';
 import { type AgentNotReadyReasonKey, agentRequiresRerankModel } from '@/utils/agent-readiness';
 import { normalizeLegacyToolNames } from '@/utils/legacy-tool-names';
+import { fuzzyFilter, hasSearchQuery } from '@/utils/fuzzyFilter';
 import { installSkillCatalog, type SkillCatalogItem } from '@/api/skill';
 import { installUpgradable, servedPreviousText, upgradeVersions } from '@/utils/skillUpgrade';
 import { type WebSearchProviderEntity } from '@/api/web-search-provider';
@@ -2237,6 +2346,39 @@ const mcpOptions = computed<McpSelectOption[]>(() => {
 const showMcpServiceSelect = computed(() =>
   mcpOptions.value.length > 0 || (formData.value.config.mcp_services?.length ?? 0) > 0,
 );
+
+// ---------------------------------------------------------------------------
+// 三个候选列表（MCP / 技能 / 小工具）的搜索过滤
+// 这些列表长起来以后只能靠滚动逐条找，这里统一给一个模糊匹配的搜索框：
+// 拆词、子串优先、子序列兜底，名称命中的排在描述命中之前（见 utils/fuzzyFilter）。
+// 过滤只影响「显示什么」，勾选状态始终留在 formData 里，不会被搜掉。
+// ---------------------------------------------------------------------------
+const mcpQuery = ref('');
+const skillsQuery = ref('');
+const miniToolsQuery = ref('');
+
+// 退化匹配开关：默认开（子序列也算命中）。关掉后只认连续子串，用于结果太杂时收窄。
+// 三处共用一份 —— 这是使用者的检索习惯，切页签不应该被重置。
+const degradeMatch = ref(true);
+const matchOptions = computed(() => ({ degrade: degradeMatch.value }));
+
+const mcpMatches = computed(() =>
+  fuzzyFilter(mcpOptions.value, mcpQuery.value, (mcp) => [{ text: mcp.label }], matchOptions.value),
+);
+
+// 多选下拉的标签是从选项列表里取 label 的：把已选中的服务从列表里筛掉，标签会退化成原始 id。
+// 所以已选项即使不匹配也保留在最前面。
+const filteredMcpOptions = computed(() => {
+  if (!hasSearchQuery(mcpQuery.value)) return mcpOptions.value;
+  const selected = new Set(formData.value.config.mcp_services || []);
+  const matchedValues = new Set(mcpMatches.value.map((mcp) => mcp.value));
+  const pinned = mcpOptions.value.filter((mcp) => selected.has(mcp.value) && !matchedValues.has(mcp.value));
+  return pinned.length ? [...pinned, ...mcpMatches.value] : mcpMatches.value;
+});
+
+const mcpNoMatch = computed(() =>
+  hasSearchQuery(mcpQuery.value) && mcpMatches.value.length === 0,
+);
 const webSearchProviderList = ref<WebSearchProviderEntity[]>([]);
 const skillCatalog = ref<SkillCatalogItem[]>([]);
 const catalogReady = ref(false);
@@ -2257,6 +2399,29 @@ const miniToolGroups = computed(() => {
   }
   return Array.from(groups.entries()).map(([key, tools]) => ({ key, label: key, tools }));
 });
+
+const filteredMiniToolGroups = computed(() =>
+  miniToolGroups.value
+    .map((group) => ({
+      ...group,
+      tools: fuzzyFilter(group.tools, miniToolsQuery.value, (tool) => [
+        { text: tool.name },
+        { text: tool.description || '', weight: 0.55 },
+        { text: tool.category || '', weight: 0.4 },
+      ], matchOptions.value),
+    }))
+    .filter((group) => group.tools.length > 0),
+);
+
+const miniToolsMatchCount = computed(() =>
+  filteredMiniToolGroups.value.reduce((sum, group) => sum + group.tools.length, 0),
+);
+
+const miniToolsNoMatch = computed(() =>
+  hasSearchQuery(miniToolsQuery.value)
+  && miniToolsMatchCount.value === 0
+  && miniToolOptions.value.length > 0,
+);
 
 async function loadMiniToolOptions() {
   try {
@@ -2363,6 +2528,30 @@ const catalogSkillGroups = computed(() => {
   }
   return groups
 })
+
+const filteredCatalogSkillGroups = computed(() =>
+  catalogSkillGroups.value
+    .map((group) => ({
+      ...group,
+      skills: fuzzyFilter(group.skills, skillsQuery.value, (skill) => [
+        { text: skill.name },
+        { text: skill.description || '', weight: 0.55 },
+        { text: skill.id || '', weight: 0.4 },
+      ], matchOptions.value),
+    }))
+    // 分组标题在没有命中项时整组收起来，避免只剩一串空标题。
+    .filter((group) => group.skills.length > 0),
+);
+
+const skillsMatchCount = computed(() =>
+  filteredCatalogSkillGroups.value.reduce((sum, group) => sum + group.skills.length, 0),
+);
+
+const skillsNoMatch = computed(() =>
+  hasSearchQuery(skillsQuery.value)
+  && skillsMatchCount.value === 0
+  && catalogSkillRows.value.length > 0,
+);
 
 // Risk is shown before the operator binds a skill, not only in settings: the
 // decision that matters is which capability the agent may use. Unknown values
@@ -6062,6 +6251,8 @@ const handleSave = async () => {
 .tool-groups {
   display: flex;
   flex-direction: column;
+  /* 同 .skill-pick-list：挡掉 t-checkbox-group 的 flex-wrap: wrap，避免分组横向铺开 */
+  flex-wrap: nowrap;
   gap: 22px;
   width: 100%;
 }
@@ -6147,16 +6338,12 @@ const handleSave = async () => {
   background: var(--td-cyan-6, #09a3b7);
 }
 
-// 统一两列网格；小屏退化单列
+/* 单列纵向排列：卡片一行一个，不同类型的分组依次往下排 */
 .tool-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
   width: 100%;
-
-  @media (max-width: 720px) {
-    grid-template-columns: 1fr;
-  }
 }
 
 // ===== 工具卡片（基于 t-checkbox 的 label 结构） =====
@@ -6334,9 +6521,163 @@ const handleSave = async () => {
   font-style: italic;
 }
 
+/* ---------------------------------------------------------------------------
+   候选列表（MCP 服务 / 技能 / 小工具）的搜索过滤
+   列表动辄几十上百项，靠滚动找项太慢：统一在列表上方给一个模糊搜索框。
+   --------------------------------------------------------------------------- */
+.setting-control-stack {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 8px;
+  overflow: visible;
+}
+
+.pick-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  min-width: 0;
+}
+
+.pick-filter__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 380px;
+}
+
+/* 退化匹配开关：轨道 + 文字，两种状态分别是「模糊」与「精确」 */
+.pick-mode {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 9px 0 7px;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 999px;
+  color: var(--td-text-color-secondary);
+  font-size: var(--app-text-sm);
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.18s ease, color 0.18s ease;
+}
+
+.pick-mode:hover {
+  border-color: var(--td-brand-color);
+  color: var(--td-text-color-primary);
+}
+
+.pick-mode__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pick-mode__track {
+  position: relative;
+  display: block;
+  width: 22px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--td-bg-color-component);
+  transition: background 0.18s ease;
+}
+
+.pick-mode__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--td-text-color-placeholder);
+  transition: transform 0.18s cubic-bezier(0.34, 1.4, 0.64, 1), background 0.18s ease;
+}
+
+.pick-mode__input:checked + .pick-mode__track {
+  background: var(--td-brand-color);
+}
+
+.pick-mode__input:checked + .pick-mode__track .pick-mode__thumb {
+  transform: translateX(10px);
+  background: #fff;
+}
+
+.pick-mode__input:checked ~ .pick-mode__text {
+  color: var(--td-brand-color);
+  font-weight: 500;
+}
+
+.pick-mode__input:focus-visible + .pick-mode__track {
+  outline: 2px solid var(--td-brand-color);
+  outline-offset: 2px;
+}
+
+.pick-filter__count {
+  flex-shrink: 0;
+  font-size: var(--app-text-sm);
+  color: var(--td-text-color-placeholder);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* MCP 行内：无匹配时贴着下拉框给一句提示 */
+.pick-filter__empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 0;
+  font-size: var(--app-text-sm);
+  color: var(--td-text-color-placeholder);
+}
+
+.pick-filter__sep {
+  color: var(--td-component-border);
+}
+
+/* 技能 / 小工具列表：搜索框固定在顶部，只有列表本身滚动 */
+.skill-pick-list--scroll {
+  max-height: min(52vh, 460px);
+  overflow-y: auto;
+  padding-right: 4px;
+  overscroll-behavior: contain;
+}
+
+.pick-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 28px 16px;
+  border: 1px dashed var(--td-component-stroke);
+  border-radius: var(--app-radius-md);
+  color: var(--td-text-color-placeholder);
+  font-size: var(--app-text-sm);
+  text-align: center;
+}
+
+.pick-empty__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
 .skill-pick-list {
   display: flex;
   flex-direction: column;
+  /* t-checkbox-group 自带 flex-wrap: wrap；配合上面的 max-height，溢出时会在「列方向」
+     换行，把后面的类型分组挤到右边变成多列。这里必须显式关掉。 */
+  flex-wrap: nowrap;
   gap: 16px;
   width: 100%;
 }
@@ -6344,6 +6685,8 @@ const handleSave = async () => {
 .skill-pick-group {
   display: flex;
   flex-direction: column;
+  /* 列表在 max-height 内滚动，分组不能被 flex 压扁 */
+  flex-shrink: 0;
   gap: 8px;
 }
 

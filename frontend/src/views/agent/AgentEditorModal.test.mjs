@@ -118,8 +118,15 @@ test('skills and sandbox share one editor section', () => {
   assert.match(navItems, /icon: SKILL_ICON/)
   assert.doesNotMatch(navItems, /key: 'sandbox'/)
 
-  const capabilityGroup = source.match(/pickItems\(\['multimodal', 'tools', 'mcp', 'skills'\]\)/)
+  // 能力组要同时容纳 MCP / 技能 / 小工具，且不再有独立的 sandbox 页签。
+  // 用「含 skills 的那个 pickItems 分组」定位，避免键顺序调整就把断言打挂。
+  const capabilityGroup = source
+    .match(/items: pickItems\(\[([^\]]*)\]\)/g)
+    ?.find((line) => line.includes("'skills'"))
   assert.ok(capabilityGroup, 'expected the capability group to list skills without a separate sandbox tab')
+  assert.match(capabilityGroup, /'mcp'/)
+  assert.match(capabilityGroup, /'minitools'/)
+  assert.doesNotMatch(capabilityGroup, /'sandbox'/)
 
   assert.match(source, /v-show="currentSection === 'skills' && isAgentMode"/)
   assert.doesNotMatch(source, /currentSection === 'sandbox' && isAgentMode/)

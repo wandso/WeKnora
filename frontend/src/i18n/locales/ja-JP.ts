@@ -8067,6 +8067,19 @@ export default {
   },
   agentEditor: {
     builtinHint: 'これは組み込みエージェントです。名前と説明は変更できませんが、設定パラメータは調整できます。',
+    filter: {
+      mcpPlaceholder: 'MCP サービス名で検索',
+      skillsPlaceholder: 'スキル名または説明で検索',
+      miniToolsPlaceholder: 'ミニツール名または説明で検索',
+      count: '{matched} / {total} 件',
+      empty: '「{query}」に一致する項目はありません',
+      reset: '検索をクリア',
+      degradeOn: 'あいまい',
+      degradeOff: '完全一致',
+      degradeHintOn: 'あいまい検索：文字の飛び越えを許します（kb で knowledge-base に一致）。クリックで完全一致に切り替え',
+      degradeHintOff: '完全一致：連続した文字だけを対象にします。クリックであいまい検索に切り替え',
+      tryDegrade: 'あいまい検索を試す'
+    },
     navGroups: {
       basic: '基本',
       knowledge: 'ナレッジと検索',

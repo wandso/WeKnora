@@ -1604,6 +1604,19 @@ export default {
   },
   agentEditor: {
     builtinHint: '这是内置智能体，名称和描述不可修改，但可以调整配置参数',
+    filter: {
+      mcpPlaceholder: '搜索 MCP 服务，按名称匹配',
+      skillsPlaceholder: '搜索技能名称或描述',
+      miniToolsPlaceholder: '搜索小工具名称或描述',
+      count: '匹配 {matched} / 共 {total}',
+      empty: '没有匹配「{query}」的项',
+      reset: '清除搜索',
+      degradeOn: '模糊',
+      degradeOff: '精确',
+      degradeHintOn: '模糊匹配：允许文字不连续（如 kb 命中 knowledge-base）。点击改为精确匹配',
+      degradeHintOff: '精确匹配：只匹配连续出现的文字。点击改为模糊匹配',
+      tryDegrade: '试试模糊匹配'
+    },
     fileTypes: {
       label: '支持的文件类型',
       desc: '限制可选择的文件类型，留空表示支持所有类型',

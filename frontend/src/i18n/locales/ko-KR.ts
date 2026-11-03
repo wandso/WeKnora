@@ -1602,6 +1602,19 @@ export default {
   },
   agentEditor: {
     builtinHint: '내장 에이전트입니다. 이름과 설명은 수정할 수 없지만, 설정 매개변수는 조정할 수 있습니다.',
+    filter: {
+      mcpPlaceholder: 'MCP 서비스 이름으로 검색',
+      skillsPlaceholder: '스킬 이름 또는 설명으로 검색',
+      miniToolsPlaceholder: '미니 도구 이름 또는 설명으로 검색',
+      count: '{matched} / {total}개',
+      empty: '“{query}”와 일치하는 항목이 없습니다',
+      reset: '검색 지우기',
+      degradeOn: '퍼지',
+      degradeOff: '정확',
+      degradeHintOn: '퍼지 매칭: 문자 건너뛰기를 허용합니다(kb → knowledge-base). 클릭하면 정확 매칭으로 전환',
+      degradeHintOff: '정확 매칭: 연속된 문자만 일치합니다. 클릭하면 퍼지 매칭으로 전환',
+      tryDegrade: '퍼지 매칭 사용해 보기'
+    },
     fileTypes: {
       label: '지원 파일 유형',
       desc: '선택 가능한 파일 유형을 제한합니다. 비워두면 모든 유형을 지원합니다.',

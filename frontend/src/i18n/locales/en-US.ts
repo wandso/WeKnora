@@ -8206,6 +8206,19 @@ export default {
   },
   agentEditor: {
     builtinHint: 'This is a built-in agent. Name and description cannot be modified, but configuration parameters can be adjusted.',
+    filter: {
+      mcpPlaceholder: 'Search MCP services by name',
+      skillsPlaceholder: 'Search skills by name or description',
+      miniToolsPlaceholder: 'Search mini tools by name or description',
+      count: '{matched} of {total}',
+      empty: 'Nothing matches “{query}”',
+      reset: 'Clear search',
+      degradeOn: 'Fuzzy',
+      degradeOff: 'Exact',
+      degradeHintOn: 'Fuzzy match: letters may be skipped (kb finds knowledge-base). Click for exact match.',
+      degradeHintOff: 'Exact match: only contiguous text counts. Click for fuzzy match.',
+      tryDegrade: 'Try fuzzy match'
+    },
     navGroups: {
       basic: 'Basics',
       knowledge: 'Knowledge & Retrieval',

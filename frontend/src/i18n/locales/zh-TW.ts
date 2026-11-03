@@ -1604,6 +1604,19 @@ export default {
   },
   agentEditor: {
     builtinHint: '這是內建智慧代理，名稱和描述不可修改，但可以調整設定參數',
+    filter: {
+      mcpPlaceholder: '搜尋 MCP 服務，依名稱比對',
+      skillsPlaceholder: '搜尋技能名稱或描述',
+      miniToolsPlaceholder: '搜尋小工具名稱或描述',
+      count: '符合 {matched} / 共 {total}',
+      empty: '沒有符合「{query}」的項目',
+      reset: '清除搜尋',
+      degradeOn: '模糊',
+      degradeOff: '精確',
+      degradeHintOn: '模糊比對：允許文字不連續（如 kb 命中 knowledge-base）。點擊改為精確比對',
+      degradeHintOff: '精確比對：只比對連續出現的文字。點擊改為模糊比對',
+      tryDegrade: '試試模糊比對'
+    },
     fileTypes: {
       label: '支持的檔案類型',
       desc: '限制可選擇的檔案類型，留空表示支持所有類型',
