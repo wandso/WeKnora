@@ -100,6 +100,12 @@ func RegisterSkillRoutes(r *gin.RouterGroup, skillHandler *handler.SkillHandler,
 		// The service layer separately requires the row to belong to the
 		// caller's workspace.
 		catalogWrite.PUT("/:id/visibility", g.Admin(), skillHandler.SetCatalogVisibility)
+		// Description editing and translation are console metadata: they never
+		// touch the stored zip, so an installed image keeps its SKILL.md until
+		// the next install. Translation still sits in the write group because
+		// it spends the workspace's model quota and rewrites the definition.
+		catalogWrite.PUT("/:id/description", g.Admin(), skillHandler.PutCatalogDescription)
+		catalogWrite.POST("/:id/translate", g.Admin(), skillHandler.TranslateCatalogDescription)
 	}
 }
 

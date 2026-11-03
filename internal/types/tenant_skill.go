@@ -272,7 +272,13 @@ type TenantSkillCatalogEntity struct {
 	Name         string `gorm:"type:varchar(255);not null"`
 	Version      string `gorm:"type:varchar(64)"`
 	Description  string `gorm:"type:text"`
-	Instructions string `gorm:"type:text"`
+	// DescriptionI18n holds console-only per-language overrides of Description
+	// as a JSON object keyed by language code ("zh", "en"). Description stays
+	// the text parsed out of SKILL.md, which is what the running image and the
+	// agent prompt use; this column never changes behaviour, only what the
+	// console prints on a card.
+	DescriptionI18n string `gorm:"type:text"`
+	Instructions    string `gorm:"type:text"`
 	// BundleRef locates the one stored zip for this definition. Install rows
 	// do not own a copy: sandbox uninstall must not delete this object.
 	BundleRef    string `gorm:"type:varchar(1024)"`
@@ -290,3 +296,81 @@ type TenantSkillCatalogEntity struct {
 
 // TableName pins the table so GORM's pluralizer cannot drift.
 func (e *TenantSkillCatalogEntity) TableName() string { return "tenant_skill_catalog" }
+
+// Console description languages. A closed set on purpose: the card only looks
+// up these codes, so storing a variant for anything else would be dead weight.
+const (
+	SkillDescriptionLangZh = "zh"
+	SkillDescriptionLangEn = "en"
+)
+
+// NormalizeSkillDescriptionLang lower-cases and validates a language code.
+// "cn" and "zh-CN" are accepted as aliases of "zh" because both arrive from
+// browsers; everything else is refused.
+func NormalizeSkillDescriptionLang(lang string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(lang)) {
+	case SkillDescriptionLangZh, "cn", "zh-cn", "zh-hans":
+		return SkillDescriptionLangZh, true
+	case SkillDescriptionLangEn, "en-us", "en-gb":
+		return SkillDescriptionLangEn, true
+	default:
+		return "", false
+	}
+}
+
+// SkillDescriptionLanguageName is how a prompt names the language it should
+// translate into. Kept next to the codes so the two cannot drift.
+func SkillDescriptionLanguageName(lang string) string {
+	if lang == SkillDescriptionLangZh {
+		return "Simplified Chinese"
+	}
+	return "English"
+}
+
+// DescriptionVariants decodes DescriptionI18n. A malformed or empty column
+// yields an empty map: a broken translation must never hide the description
+// parsed from SKILL.md.
+func (e *TenantSkillCatalogEntity) DescriptionVariants() map[string]string {
+	if e == nil || strings.TrimSpace(e.DescriptionI18n) == "" {
+		return map[string]string{}
+	}
+	out := map[string]string{}
+	if err := json.Unmarshal([]byte(e.DescriptionI18n), &out); err != nil {
+		return map[string]string{}
+	}
+	clean := make(map[string]string, len(out))
+	for lang, text := range out {
+		if code, ok := NormalizeSkillDescriptionLang(lang); ok && strings.TrimSpace(text) != "" {
+			clean[code] = text
+		}
+	}
+	return clean
+}
+
+// SetDescriptionVariant rewrites one language entry in DescriptionI18n.
+// Empty text removes the entry, which is how "reset to the SKILL.md text"
+// is expressed.
+func (e *TenantSkillCatalogEntity) SetDescriptionVariant(lang, text string) {
+	if e == nil {
+		return
+	}
+	variants := e.DescriptionVariants()
+	code, ok := NormalizeSkillDescriptionLang(lang)
+	if !ok {
+		return
+	}
+	if strings.TrimSpace(text) == "" {
+		delete(variants, code)
+	} else {
+		variants[code] = text
+	}
+	if len(variants) == 0 {
+		e.DescriptionI18n = ""
+		return
+	}
+	raw, err := json.Marshal(variants)
+	if err != nil {
+		return
+	}
+	e.DescriptionI18n = string(raw)
+}

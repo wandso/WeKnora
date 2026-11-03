@@ -59,6 +59,10 @@ type SkillCatalogView struct {
 	Name          string                    `json:"name" extensions:"x-agent"`
 	Version       string                    `json:"version,omitempty" extensions:"x-agent"`
 	Description   string                    `json:"description,omitempty" extensions:"x-agent"`
+	// DescriptionI18n carries console translations of Description keyed by
+	// language code. Absent entries mean "not translated yet"; the card then
+	// falls back to Description.
+	DescriptionI18n map[string]string `json:"description_i18n,omitempty"`
 	BundleSHA256  string                    `json:"bundle_sha256,omitempty"`
 	CreatedAt     time.Time                 `json:"created_at"`
 	UpdatedAt     time.Time                 `json:"updated_at"`
@@ -244,6 +248,7 @@ func catalogView(
 		Name:          cat.Name,
 		Version:       cat.Version,
 		Description:   cat.Description,
+		DescriptionI18n: cat.DescriptionVariants(),
 		BundleSHA256:  cat.BundleSHA256,
 		CreatedAt:     cat.CreatedAt,
 		UpdatedAt:     cat.UpdatedAt,

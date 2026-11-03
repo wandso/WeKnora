@@ -45,6 +45,16 @@ type skillCatalogService interface {
 	) (*types.TenantSkillCatalogEntity, error)
 	ListCatalogFiles(ctx context.Context, tenantID uint64, catalogID string) ([]service.SkillFileEntry, error)
 	ReadCatalogFile(ctx context.Context, tenantID uint64, catalogID, relativePath string) (*service.SkillFileContent, error)
+	// EditCatalogDescription rewrites the console description of one language;
+	// lang "" or "source" targets the canonical SKILL.md text.
+	EditCatalogDescription(
+		ctx context.Context, callerTenantID uint64, catalogID, lang, description string,
+	) (*service.SkillCatalogDescriptionView, error)
+	// TranslateCatalogDescription machine-translates a description and, when
+	// save is set, stores it as that language's variant.
+	TranslateCatalogDescription(
+		ctx context.Context, callerTenantID uint64, catalogID, lang, text string, save bool,
+	) (string, *service.SkillCatalogDescriptionView, error)
 }
 
 // NewSkillHandler creates a new skill handler. catalog may be nil in tests

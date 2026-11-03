@@ -70,6 +70,19 @@ func (f *fakeSkillCatalog) ReadCatalogFile(context.Context, uint64, string, stri
 	return nil, nil
 }
 
+func (f *fakeSkillCatalog) EditCatalogDescription(
+	_ context.Context, _ uint64, id, _, description string,
+) (*service.SkillCatalogDescriptionView, error) {
+	return &service.SkillCatalogDescriptionView{ID: id, Description: description}, nil
+}
+
+func (f *fakeSkillCatalog) TranslateCatalogDescription(
+	_ context.Context, _ uint64, id, lang, _ string, _ bool,
+) (string, *service.SkillCatalogDescriptionView, error) {
+	view := &service.SkillCatalogDescriptionView{ID: id, DescriptionI18n: map[string]string{lang: "translated"}}
+	return "translated", view, nil
+}
+
 func newCatalogRouter(h *SkillHandler) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()

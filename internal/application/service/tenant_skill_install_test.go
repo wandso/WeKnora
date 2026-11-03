@@ -2798,6 +2798,21 @@ func (r *installSkillRepo) UpdateCatalog(_ context.Context, e *types.TenantSkill
 	return nil
 }
 
+func (r *installSkillRepo) UpdateCatalogDescriptions(
+	_ context.Context, _ uint64, catalogID, description, descriptionI18n string,
+) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.updateCatalogErr != nil {
+		return r.updateCatalogErr
+	}
+	if row := r.catalogs[catalogID]; row != nil {
+		row.Description = description
+		row.DescriptionI18n = descriptionI18n
+	}
+	return nil
+}
+
 func (r *installSkillRepo) DeleteCatalog(_ context.Context, _ uint64, catalogID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

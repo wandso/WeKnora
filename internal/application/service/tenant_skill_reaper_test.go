@@ -966,6 +966,9 @@ func (r *reaperSkillStore) ListCatalogsByTenant(
 func (r *reaperSkillStore) UpdateCatalog(context.Context, *types.TenantSkillCatalogEntity) error {
 	panic("UpdateCatalog is outside the reaper surface")
 }
+func (r *reaperSkillStore) UpdateCatalogDescriptions(context.Context, uint64, string, string, string) error {
+	panic("UpdateCatalogDescriptions is outside the reaper surface")
+}
 func (r *reaperSkillStore) DeleteCatalog(context.Context, uint64, string) error {
 	panic("DeleteCatalog is outside the reaper surface")
 }

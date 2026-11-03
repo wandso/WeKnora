@@ -341,6 +341,107 @@ func (h *SkillHandler) GetCatalogFile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": file})
 }
 
+// catalogDescriptionRequest is the body of PUT /skills/catalog/{id}/description.
+type catalogDescriptionRequest struct {
+	// Lang selects what is being written: "" or "source" for the canonical
+	// description parsed out of SKILL.md, "zh"/"en" for a console translation.
+	Lang string `json:"lang"`
+	// Description is the new text. Empty clears a translation variant, and
+	// clears the canonical description when lang targets the source.
+	Description string `json:"description"`
+}
+
+// PutCatalogDescription godoc
+// @Summary      Edit the description of a workspace skill
+// @Description  Rewrites the console description. lang "" or "source" writes the canonical SKILL.md text; "zh"/"en" write a console-only translation. The stored bundle is untouched, so installed sandboxes keep the SKILL.md they were built from.
+// @Tags         Skills
+// @Accept       json
+// @Produce      json
+// @Param        id       path  string                     true  "Catalog skill ID"
+// @Param        request  body  catalogDescriptionRequest  true  "New description"
+// @Success      200  {object}  handler.DataResponse{data=service.SkillCatalogDescriptionView}
+// @Security     Bearer
+// @Security     ApiKeyAuth
+// @Router       /skills/catalog/{id}/description [put]
+func (h *SkillHandler) PutCatalogDescription(c *gin.Context) {
+	if h.catalog == nil {
+		_ = c.Error(apperrors.NewInternalServerError("skill catalog is not configured"))
+		return
+	}
+	limitJSONBody(c, skillSourceJSONMaxBytes)
+	var req catalogDescriptionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		if isRequestBodyTooLarge(err) {
+			_ = c.Error(skillJSONRequestTooLargeError())
+			return
+		}
+		_ = c.Error(apperrors.NewBadRequestError("invalid description request"))
+		return
+	}
+	view, err := h.catalog.EditCatalogDescription(
+		c.Request.Context(), sandboxConfigTenantID(c), c.Param("id"), req.Lang, req.Description,
+	)
+	if err != nil {
+		respondSkillServiceError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": view})
+}
+
+// catalogTranslateRequest is the body of POST /skills/catalog/{id}/translate.
+type catalogTranslateRequest struct {
+	// Lang is the language to translate into: "zh" or "en".
+	Lang string `json:"lang"`
+	// Text is what to translate. Empty means the definition's own description,
+	// which is what the card's one-click action sends.
+	Text string `json:"text"`
+	// Save stores the result as Lang's variant; false only returns the text, so
+	// the editor can preview a translation before committing it.
+	Save bool `json:"save"`
+}
+
+// TranslateCatalogDescription godoc
+// @Summary      Translate a workspace skill description
+// @Description  Machine-translates a description with the workspace's chat model. With save=true the result becomes that language's console description; the run is refused, not silently skipped, when no chat model is configured.
+// @Tags         Skills
+// @Accept       json
+// @Produce      json
+// @Param        id       path  string                   true  "Catalog skill ID"
+// @Param        request  body  catalogTranslateRequest  true  "Target language"
+// @Success      200  {object}  handler.DataResponse{data=object}
+// @Security     Bearer
+// @Security     ApiKeyAuth
+// @Router       /skills/catalog/{id}/translate [post]
+func (h *SkillHandler) TranslateCatalogDescription(c *gin.Context) {
+	if h.catalog == nil {
+		_ = c.Error(apperrors.NewInternalServerError("skill catalog is not configured"))
+		return
+	}
+	limitJSONBody(c, skillSourceJSONMaxBytes)
+	var req catalogTranslateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		if isRequestBodyTooLarge(err) {
+			_ = c.Error(skillJSONRequestTooLargeError())
+			return
+		}
+		_ = c.Error(apperrors.NewBadRequestError("invalid translation request"))
+		return
+	}
+	translated, view, err := h.catalog.TranslateCatalogDescription(
+		c.Request.Context(), sandboxConfigTenantID(c), c.Param("id"), req.Lang, req.Text, req.Save,
+	)
+	if err != nil {
+		respondSkillServiceError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{
+		"lang":        req.Lang,
+		"description": translated,
+		"saved":       req.Save,
+		"catalog":     view,
+	}})
+}
+
 func catalogIDResponse(cat *types.TenantSkillCatalogEntity) gin.H {
 	if cat == nil {
 		return gin.H{}

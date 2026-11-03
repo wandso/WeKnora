@@ -99,6 +99,12 @@ type TenantSkillRepository interface {
 	SetCatalogVisibility(ctx context.Context, tenantID uint64, catalogID string, visibility string) error
 	// UpdateCatalog writes mutable definition fields (bundle, description, version).
 	UpdateCatalog(ctx context.Context, e *types.TenantSkillCatalogEntity) error
+	// UpdateCatalogDescriptions rewrites only the two description columns, so
+	// an operator editing a label cannot accidentally clobber a concurrent
+	// bundle re-register.
+	UpdateCatalogDescriptions(
+		ctx context.Context, tenantID uint64, catalogID, description, descriptionI18n string,
+	) error
 	// DeleteCatalog soft-deletes a definition. Install rows are not touched.
 	DeleteCatalog(ctx context.Context, tenantID uint64, catalogID string) error
 	// ListSkillsByCatalog returns installations of one catalog skill.
@@ -514,6 +520,19 @@ func (r *tenantSkillRepository) UpdateCatalog(ctx context.Context, e *types.Tena
 			"bundle_ref":    e.BundleRef,
 			"bundle_sha256": e.BundleSHA256,
 			"updated_at":    time.Now(),
+		}).Error
+}
+
+func (r *tenantSkillRepository) UpdateCatalogDescriptions(
+	ctx context.Context, tenantID uint64, catalogID, description, descriptionI18n string,
+) error {
+	return r.db.WithContext(ctx).
+		Model(&types.TenantSkillCatalogEntity{}).
+		Where("tenant_id = ? AND id = ?", tenantID, catalogID).
+		Updates(map[string]any{
+			"description":      description,
+			"description_i18n": descriptionI18n,
+			"updated_at":       time.Now(),
 		}).Error
 }
 
