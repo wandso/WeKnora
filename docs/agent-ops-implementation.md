@@ -27,8 +27,8 @@
 
 新增迁移（PostgreSQL 与 SQLite 双份）：
 
-- `migrations/versioned/000136_agent_ops.up.sql` / `.down.sql`
-- `migrations/sqlite/000053_agent_ops.up.sql` / `.down.sql`
+- `migrations/versioned/0001002_agent_ops.up.sql` / `.down.sql`
+- `migrations/sqlite/0001002_agent_ops.up.sql` / `.down.sql`
 
 四张表：
 

@@ -88,12 +88,14 @@ prompt_hint: 先列条款再给结论
 
 ## 5. 迁移与验证
 
-- `migrations/versioned/000134_mini_tools.{up,down}.sql`
-- `migrations/versioned/000135_skill_governance.{up,down}.sql`
-- `migrations/sqlite/000051_mini_tools.{up,down}.sql`
-- `migrations/sqlite/000052_skill_governance.{up,down}.sql`
+工作区自定义的迁移统一放在 `1000` 号段之后，避免与上游持续推进的 1xx 号段撞号。
 
-启动时由既有 golang-migrate 流程执行（实测 118 → 135 一次到位）。回滚顺序为 000135 → 000134。
+- `migrations/versioned/0001000_mini_tools.{up,down}.sql`
+- `migrations/versioned/0001001_skill_governance.{up,down}.sql`
+- `migrations/sqlite/0001000_mini_tools.{up,down}.sql`
+- `migrations/sqlite/0001001_skill_governance.{up,down}.sql`
+
+启动时由既有 golang-migrate 流程执行（实测 118 → 1000 一次到位）。回滚顺序为 0001001 → 0001000。
 
 ## 6. 在本机构建与发布
 
