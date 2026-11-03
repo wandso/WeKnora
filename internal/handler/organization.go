@@ -1404,8 +1404,12 @@ func (h *OrganizationHandler) ShareAgent(c *gin.Context) {
 			c.Error(apperrors.NewForbiddenError("Only editors and admins can share agents to this organization"))
 			return
 		}
-		if errors.Is(err, service.ErrAgentNotConfigured) {
-			c.Error(apperrors.NewValidationError("Agent is not fully configured. Please set the chat model, and set the rerank model if the knowledge_search tool is enabled in agent settings."))
+		if errors.Is(err, service.ErrAgentMissingChatModel) {
+			c.Error(apperrors.NewValidationError("This agent has no chat model. Choose a chat model in the agent settings, then share it again."))
+			return
+		}
+		if errors.Is(err, service.ErrAgentMissingRerankModel) {
+			c.Error(apperrors.NewValidationError("This agent searches knowledge bases with the search_knowledge tool, which needs a rerank model. Pick one in the agent settings, or turn that tool off, then share it again."))
 			return
 		}
 		if errors.Is(err, service.ErrBuiltinAgentNotShareable) {

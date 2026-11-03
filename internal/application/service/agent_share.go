@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Tencent/WeKnora/internal/agent/tools"
@@ -24,9 +25,14 @@ var (
 	// workspace has its own copy under the same ID, so a shared built-in would
 	// be indistinguishable from the receiver's own agent.
 	ErrBuiltinAgentNotShareable = errors.New("built-in agents cannot be shared")
-	ErrAgentNotConfigured       = errors.New(
-		"agent is not fully configured (missing required chat model, or rerank model when the search_knowledge " +
-			"tool is enabled)",
+	// ErrAgentMissingChatModel and ErrAgentMissingRerankModel split what used
+	// to be one "not configured" error. The combined message named both causes
+	// at once, so the console could not tell the operator which setting to fix
+	// — and an agent that was simply missing its chat model looked like it had
+	// a rerank problem too.
+	ErrAgentMissingChatModel   = errors.New("agent has no chat model")
+	ErrAgentMissingRerankModel = errors.New(
+		"agent searches knowledge bases but has no rerank model",
 	)
 )
 
@@ -48,7 +54,13 @@ func agentRequiresRerankModel(agent *types.CustomAgent) bool {
 	if agent == nil {
 		return false
 	}
-	if agent.Config.KBSelectionMode == "none" {
+	// An unset mode means the same thing as "none" everywhere else in the
+	// codebase (the share DTO renders empty as "none", and the runtime only
+	// activates retrieval for "all" / "selected"). Agents created through the
+	// API without this field, or rows that predate it, therefore used to be
+	// asked for a rerank model they could never use.
+	switch strings.TrimSpace(agent.Config.KBSelectionMode) {
+	case "", "none":
 		return false
 	}
 	for _, t := range tools.EffectiveAllowedTools(agent.Config.AllowedTools) {
@@ -218,11 +230,11 @@ func (s *agentShareService) ShareAgent(ctx context.Context, agentID string, orgI
 		return nil, err
 	}
 
-	if agent.Config.ModelID == "" {
-		return nil, ErrAgentNotConfigured
+	if strings.TrimSpace(agent.Config.ModelID) == "" {
+		return nil, ErrAgentMissingChatModel
 	}
-	if agentRequiresRerankModel(agent) && agent.Config.RerankModelID == "" {
-		return nil, ErrAgentNotConfigured
+	if agentRequiresRerankModel(agent) && strings.TrimSpace(agent.Config.RerankModelID) == "" {
+		return nil, ErrAgentMissingRerankModel
 	}
 
 	_, err = s.orgRepo.GetByID(ctx, orgID)

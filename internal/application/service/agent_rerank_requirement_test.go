@@ -1,11 +1,14 @@
 package service
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
 	"github.com/Tencent/WeKnora/internal/agent/tools"
+	"github.com/Tencent/WeKnora/internal/application/repository"
 	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -44,6 +47,26 @@ func TestAgentRequiresRerankModel(t *testing.T) {
 			name: "default tools with knowledge bases disabled",
 			agent: &types.CustomAgent{Config: types.CustomAgentConfig{
 				KBSelectionMode: "none",
+			}},
+			want: false,
+		},
+		{
+			// Rows written before KBSelectionMode existed, and agents created
+			// through the API without the field, carry "". Every other reader
+			// (share DTO, runtime) treats that as "none", so this check must
+			// too — otherwise the operator is told to pick a rerank model the
+			// agent can never use.
+			name: "unset mode with default tools",
+			agent: &types.CustomAgent{Config: types.CustomAgentConfig{
+				ModelID: "model-1",
+			}},
+			want: false,
+		},
+		{
+			name: "whitespace mode with knowledge search tool",
+			agent: &types.CustomAgent{Config: types.CustomAgentConfig{
+				KBSelectionMode: "  ",
+				AllowedTools:    []string{tools.ToolSearchKnowledge},
 			}},
 			want: false,
 		},
@@ -128,4 +151,81 @@ func TestPickWorkspaceRerankModelID(t *testing.T) {
 			assert.Equal(t, tt.want, pickWorkspaceRerankModelID(tt.models))
 		})
 	}
+}
+
+type shareTestKBRepo struct {
+	interfaces.KnowledgeBaseRepository
+	kb *types.KnowledgeBase
+}
+
+// shareTestOrgRepo stops ShareAgent right after the configuration checks:
+// with no organization, everything that comes next stays out of the test.
+type shareTestOrgRepo struct {
+	interfaces.OrganizationRepository
+}
+
+func (shareTestOrgRepo) GetByID(context.Context, string) (*types.Organization, error) {
+	return nil, repository.ErrOrganizationNotFound
+}
+
+func (r shareTestKBRepo) GetKnowledgeBaseByIDs(
+	_ context.Context, _ []string,
+) ([]*types.KnowledgeBase, error) {
+	return []*types.KnowledgeBase{r.kb}, nil
+}
+
+// A share that cannot go through used to fail with a single message naming
+// both the chat model and the rerank model, so the console could not tell the
+// operator which setting was actually missing. Each cause now reports itself.
+func TestShareAgentReportsMissingChatModel(t *testing.T) {
+	svc := &agentShareService{
+		agentRepo: &builtinShareAgentRepo{agent: &types.CustomAgent{
+			ID: "agent-no-model", TenantID: 84,
+			Config: types.CustomAgentConfig{KBSelectionMode: "none"},
+		}},
+		kbRepo: shareTestKBRepo{},
+	}
+
+	_, err := svc.ShareAgent(
+		context.Background(), "agent-no-model", "org-1", "user-1", 84, types.OrgRoleViewer)
+	require.ErrorIs(t, err, ErrAgentMissingChatModel)
+	require.NotErrorIs(t, err, ErrAgentMissingRerankModel)
+}
+
+// An unset KB mode must not be mistaken for "searches knowledge bases": an
+// agent with a chat model but no KB mode is shareable without a reranker.
+func TestShareAgentAllowsUnsetKBModeWithoutRerank(t *testing.T) {
+	svc := &agentShareService{
+		agentRepo: &builtinShareAgentRepo{agent: &types.CustomAgent{
+			ID: "agent-unset-kb", TenantID: 84,
+			Config: types.CustomAgentConfig{ModelID: "model-1"},
+		}},
+		kbRepo:  shareTestKBRepo{},
+		orgRepo: shareTestOrgRepo{},
+	}
+
+	// Reaches the organization lookup instead of stopping on configuration.
+	_, err := svc.ShareAgent(
+		context.Background(), "agent-unset-kb", "org-1", "user-1", 84, types.OrgRoleViewer)
+	require.ErrorIs(t, err, ErrOrgNotFound)
+}
+
+func TestShareAgentReportsMissingRerankModel(t *testing.T) {
+	svc := &agentShareService{
+		agentRepo: &builtinShareAgentRepo{agent: &types.CustomAgent{
+			ID: "agent-rerank", TenantID: 84,
+			Config: types.CustomAgentConfig{
+				ModelID:         "model-1",
+				KBSelectionMode: "selected",
+				KnowledgeBases:  []string{"kb-1"},
+				AllowedTools:    []string{tools.ToolSearchKnowledge},
+			},
+		}},
+		kbRepo: shareTestKBRepo{kb: &types.KnowledgeBase{ID: "kb-1", TenantID: 84, CreatorID: "user-1"}},
+	}
+
+	_, err := svc.ShareAgent(
+		context.Background(), "agent-rerank", "org-1", "user-1", 84, types.OrgRoleViewer)
+	require.ErrorIs(t, err, ErrAgentMissingRerankModel)
+	require.NotErrorIs(t, err, ErrAgentMissingChatModel)
 }
