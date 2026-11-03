@@ -35,10 +35,11 @@ function item(id: string, statuses: string[] = []): SkillCatalogItem {
 async function fixture(initial: SkillCatalogItem[], host = false) {
   let catalog = initial
   const exports: any = {}
+  const calls: Array<{ id: string; target: string; text: string }> = []
   const mocks: Record<string, unknown> = {
     'vue': require('vue'),
-    'vue-i18n': { useI18n: () => ({ t: (key: string) => key, te: () => false }) },
-    'tdesign-vue-next': { MessagePlugin: { error: assert.fail } },
+    'vue-i18n': { useI18n: () => ({ t: (key: string) => key, te: () => false, locale: ref('zh-CN') }) },
+    'tdesign-vue-next': { MessagePlugin: { error: assert.fail, success: () => {} } },
     '@/stores/ui': { useUIStore: () => ({}) },
     '@/stores/deploymentCapabilities': {
       useDeploymentCapabilitiesStore: () => ({
@@ -53,7 +54,20 @@ async function fixture(initial: SkillCatalogItem[], host = false) {
     '@/composables/useConfigSkillInstallProgress': {
       useConfigSkillInstallProgress: () => ({ percentOf: () => null, sync() {}, stopAll() {} }),
     },
-    '@/api/skill': { listSkillCatalog: async () => ({ data: catalog }) },
+    '@/api/skill': {
+      listSkillCatalog: async () => ({ data: catalog }),
+      updateSkillCatalogDescription: async (id: string, target: string, text: string) => {
+        calls.push({ id, target, text })
+        return { success: true, data: { id, description: text, description_i18n: {} } }
+      },
+      translateSkillCatalogDescription: async () => ({
+        success: true,
+        data: {
+          lang: 'zh', description: '机器译文', saved: false,
+          catalog: { id: 'x', description: '', description_i18n: {} },
+        },
+      }),
+    },
     '@/api/system': { listSandboxConfigs: async () => ({ data: [] }) },
     '@/utils/resourceListSearch': { matchesResourceQuery },
     '@/utils/skillTarget': skillTarget,
@@ -84,7 +98,7 @@ async function fixture(initial: SkillCatalogItem[], host = false) {
   await new Promise<void>(resolve => setImmediate(resolve))
   await nextTick()
   return {
-    vm, close: () => app.unmount(),
+    vm, close: () => app.unmount(), calls,
     reload: async (rows: SkillCatalogItem[]) => { catalog = rows; await vm.loadCatalog(true) },
   }
 }
@@ -125,3 +139,57 @@ for (const host of [false, true]) {
     } finally { f.close() }
   })
 }
+
+// The description language picks which variant the card prints; a language
+// without a stored variant falls back to the text parsed out of SKILL.md.
+test('skill descriptions follow the selected language and fall back to the source', async () => {
+  const data = [item('pdf')]
+  data[0]!.description = 'Extract text and tables.'
+  data[0]!.description_i18n = { zh: '提取文本与表格。' }
+  const f = await fixture(data)
+  try {
+    assert.equal(f.vm.descriptionFor(f.vm.catalog[0]), '提取文本与表格。')
+    f.vm.descriptionLang = 'en'
+    assert.equal(f.vm.descriptionFor(f.vm.catalog[0]), 'Extract text and tables.')
+    // Translate is offered again only once the visible language has text of
+    // its own; the source fallback must not count as a translation.
+    assert.equal(f.vm.translateLabel(f.vm.catalog[0]), 'settings.skills.descriptionTranslate')
+    f.vm.descriptionLang = 'zh'
+    assert.equal(f.vm.translateLabel(f.vm.catalog[0]), 'settings.skills.descriptionRetranslate')
+  } finally { f.close() }
+})
+
+test('only definitions this workspace can edit expose description editing', async () => {
+  const data = [item('own'), item('foreign'), item('readonly')]
+  data[0]!.can_edit = true
+  data[1]!.can_edit = true
+  data[1]!.is_foreign = true
+  data[2]!.can_edit = false
+  const f = await fixture(data)
+  try {
+    assert.equal(f.vm.canEditDescription(f.vm.catalog[0]), true)
+    assert.equal(f.vm.canEditDescription(f.vm.catalog[1]), false)
+    assert.equal(f.vm.canEditDescription(f.vm.catalog[2]), false)
+  } finally { f.close() }
+})
+
+test('the description editor prefills, translates into the textarea and saves the language', async () => {
+  const data = [item('pdf')]
+  data[0]!.description = 'Extract text and tables.'
+  data[0]!.can_edit = true
+  const f = await fixture(data)
+  try {
+    f.vm.openDescriptionEditor(f.vm.catalog[0])
+    assert.equal(f.vm.descriptionEditor.visible, true)
+    // No zh variant yet: the editor starts from the source text.
+    assert.equal(f.vm.descriptionEditor.text, 'Extract text and tables.')
+
+    await f.vm.translateInEditor()
+    assert.equal(f.vm.descriptionEditor.text, '机器译文')
+
+    f.vm.descriptionEditor.text = '  提取文本  '
+    await f.vm.saveDescription()
+    assert.deepEqual(f.calls, [{ id: 'pdf', target: 'zh', text: '提取文本' }])
+    assert.equal(f.vm.descriptionEditor.visible, false)
+  } finally { f.close() }
+})

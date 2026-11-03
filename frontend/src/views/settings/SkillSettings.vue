@@ -26,6 +26,8 @@
     <template v-else>
       <Teleport to="#toolbox-toolbar" defer>
         <div class="skill-filters">
+          <t-select v-if="catalog.length > 0" v-model="descriptionLang" class="skill-filters__lang"
+            :options="descriptionLangOptions" size="small" :aria-label="$t('settings.skills.descriptionLang')" />
           <t-select v-if="catalog.length > 0" v-model="categoryFilter" class="skill-filters__select"
             :options="categoryFilterOptions" size="small" :aria-label="$t('settings.skills.governance.filterCategory')" />
           <t-input v-if="catalog.length > 0" v-model="query" class="list-search" :placeholder="$t('menu.search')"
@@ -88,6 +90,14 @@
                   </span>
                 </div>
                 <div class="skill-card__actions">
+                  <!-- Editing and translating are console-only metadata: they
+                       rewrite the card's text, never the stored bundle, so an
+                       installed sandbox keeps running its own SKILL.md. -->
+                  <button v-if="canEditDescription(item)" type="button" class="skill-card__icon-btn"
+                    :title="$t('settings.skills.editDescription')" :aria-label="$t('settings.skills.editDescription')"
+                    @click="openDescriptionEditor(item)">
+                    <t-icon name="edit" size="14px" />
+                  </button>
                   <button type="button" class="skill-card__icon-btn" :title="$t('settings.sandbox.skillFiles')"
                     :aria-label="$t('settings.sandbox.skillFiles')" @click="openCatalogFiles(item)">
                     <folder-icon size="14px" />
@@ -97,7 +107,8 @@
                        the drawer only opens for definitions this workspace
                        owns. Delete moved in here with it so the card keeps one
                        overflow affordance instead of three competing icons. -->
-                  <t-popup v-if="canShare(item) || canDelete(item)" :visible="openMenuId === item.id"
+                  <t-popup v-if="canShare(item) || canDelete(item) || canEditDescription(item)"
+                    :visible="openMenuId === item.id"
                     @visible-change="(visible: boolean) => setOpenMenu(item.id, visible)"
                     overlayClassName="card-more-popup" trigger="click" destroy-on-close placement="bottom-right">
                     <button type="button" class="skill-card__icon-btn" :aria-label="$t('common.expand')"
@@ -106,6 +117,14 @@
                     </button>
                     <template #content>
                       <div class="popup-menu">
+                        <div v-if="canEditDescription(item)" class="popup-menu-item"
+                          @click.stop="translateDescription(item)">
+                          <t-icon class="menu-icon"
+                            :name="descriptionVariant(item) ? 'refresh' : 'translate'" />
+                          <span>{{ translateLabel(item) }}</span>
+                        </div>
+                        <div v-if="canEditDescription(item) && (canShare(item) || canDelete(item))"
+                          class="popup-menu-divider"></div>
                         <template v-if="canShare(item)">
                           <div class="popup-menu-section-title">{{ $t('settings.skills.visibility') }}</div>
                           <div v-for="opt in VISIBILITY_OPTIONS" :key="opt.value" class="popup-menu-item visibility-option"
@@ -126,8 +145,14 @@
                   </t-popup>
                 </div>
               </div>
-              <p v-if="item.description" class="skill-card__desc" :title="item.description">
-                {{ compactText(item.description) }}
+              <!-- A local model can take a minute, so the card shows the
+                   translation in progress instead of looking inert. -->
+              <p v-if="descriptionTranslatingId === item.id" class="skill-card__desc skill-card__desc--busy">
+                <t-loading size="14px" />
+                <span>{{ $t('settings.skills.descriptionTranslating') }}</span>
+              </p>
+              <p v-else-if="descriptionFor(item)" class="skill-card__desc" :title="descriptionFor(item)">
+                {{ compactText(descriptionFor(item)) }}
               </p>
               <div v-for="view in [installsView(item)]" :key="'installs'" class="skill-card__installs">
                 <span v-if="view.installs.length === 0 && !view.canAdd" class="skill-card__installs-label">
@@ -426,11 +451,37 @@
 
     <SkillFilesDrawer v-model:visible="filesDrawerVisible" :catalog-id="filesCatalogId"
       :skill-name="filesCatalogName" />
+
+    <!-- One dialog for both actions: translating fills the textarea instead of
+         saving straight away, so the operator can fix the model's wording
+         before it becomes what the card shows. -->
+    <t-dialog v-model:visible="descriptionEditor.visible" :header="descriptionEditorTitle" width="560px"
+      destroy-on-close :confirm-btn="descriptionConfirmBtn" :cancel-btn="$t('common.cancel')"
+      @confirm="saveDescription">
+      <div class="skill-description-editor">
+        <p class="skill-description-editor__hint">
+          {{ $t('settings.skills.descriptionEditorHint', { lang: langNameOf(descriptionEditor.lang) }) }}
+        </p>
+        <t-textarea v-model="descriptionEditor.text" class="skill-description-editor__input"
+          :autosize="{ minRows: 4, maxRows: 10 }" :maxlength="MAX_SKILL_DESCRIPTION_LENGTH"
+          :placeholder="$t('settings.skills.descriptionPlaceholder')" :disabled="descriptionEditor.saving" />
+        <div class="skill-description-editor__footer">
+          <t-button size="small" variant="outline" theme="default" :loading="descriptionEditor.translating"
+            :disabled="descriptionEditor.saving" @click="translateInEditor">
+            <template #icon><t-icon name="translate" size="14px" /></template>
+            {{ $t('settings.skills.translateTo', { lang: langNameOf(descriptionEditor.lang) }) }}
+          </t-button>
+          <span class="skill-description-editor__count">
+            {{ descriptionEditor.text.length }}/{{ MAX_SKILL_DESCRIPTION_LENGTH }}
+          </span>
+        </div>
+      </div>
+    </t-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { AddIcon, DeleteIcon, FolderIcon } from 'tdesign-icons-vue-next'
 import { useI18n } from 'vue-i18n'
@@ -453,9 +504,12 @@ import {
   registerSkillCatalogFromFile,
   registerSkillCatalogFromSource,
   setSkillCatalogVisibility,
+  translateSkillCatalogDescription,
+  updateSkillCatalogDescription,
   type SkillCatalogInstall,
   type SkillCatalogItem,
   type SkillCatalogRegisterResult,
+  type SkillDescriptionLang,
 } from '@/api/skill'
 import { useSkillInstallerModel } from '@/composables/useSkillInstallerModel'
 import { useAssistantDataChange } from '@/utils/assistantDataChange'
@@ -701,6 +755,132 @@ function canDelete(item: SkillCatalogItem): boolean {
   // local installations.
   if (item.can_delete === false || item.is_foreign) return false
   return liveInstalls(item).length === 0
+}
+
+// Description language and per-language editing.
+//
+// The card prints the variant of the language picked here, falling back to the
+// text parsed out of SKILL.md when nothing has been translated yet. Editing
+// and translating write that variant only: the stored bundle is untouched, so
+// an installed sandbox keeps the SKILL.md its image was built from.
+const MAX_SKILL_DESCRIPTION_LENGTH = 4000
+const descriptionLang = ref<SkillDescriptionLang>(locale.value.startsWith('zh') ? 'zh' : 'en')
+const descriptionLangOptions = computed(() => [
+  { value: 'zh', label: t('settings.skills.descriptionLangZh') },
+  { value: 'en', label: t('settings.skills.descriptionLangEn') },
+])
+function langNameOf(lang: SkillDescriptionLang): string {
+  return lang === 'zh' ? t('settings.skills.descriptionLangZh') : t('settings.skills.descriptionLangEn')
+}
+const descriptionLangName = computed(() => langNameOf(descriptionLang.value))
+// Following the UI language is the sane default; an operator who picks a
+// language keeps it until they change the UI language again.
+watch(locale, (value) => {
+  descriptionLang.value = String(value).startsWith('zh') ? 'zh' : 'en'
+})
+
+function descriptionVariant(item: SkillCatalogItem): string {
+  return (item.description_i18n || {})[descriptionLang.value] || ''
+}
+
+function descriptionFor(item: SkillCatalogItem): string {
+  return descriptionVariant(item) || item.description || ''
+}
+
+function canEditDescription(item: SkillCatalogItem): boolean {
+  return item.can_edit === true && !item.is_foreign
+}
+
+function translateLabel(item: SkillCatalogItem): string {
+  const key = descriptionVariant(item)
+    ? 'settings.skills.descriptionRetranslate'
+    : 'settings.skills.descriptionTranslate'
+  return t(key, { lang: descriptionLangName.value })
+}
+
+const descriptionTranslatingId = ref('')
+
+// One click translates and saves: the variant then becomes what the card
+// prints, which is the whole point of the action. The dialog offers the
+// reviewed path for anyone who wants to fix the wording first.
+async function translateDescription(item: SkillCatalogItem) {
+  openMenuId.value = ''
+  if (descriptionTranslatingId.value) return
+  descriptionTranslatingId.value = item.id
+  try {
+    await translateSkillCatalogDescription(item.id, descriptionLang.value, { save: true })
+    MessagePlugin.success(t('settings.skills.descriptionTranslated', { lang: descriptionLangName.value }))
+    await loadCatalog()
+  } catch (error) {
+    MessagePlugin.error(t('settings.skills.descriptionTranslateFailed'))
+  } finally {
+    descriptionTranslatingId.value = ''
+  }
+}
+
+const descriptionEditor = reactive({
+  visible: false,
+  catalogId: '',
+  // Snapshotted when the dialog opens: switching the toolbar language while
+  // editing must not silently retarget the save at another language.
+  lang: 'zh' as SkillDescriptionLang,
+  text: '',
+  saving: false,
+  translating: false,
+})
+
+const descriptionEditorTitle = computed(() =>
+  t('settings.skills.descriptionEditorTitle', { lang: langNameOf(descriptionEditor.lang) }))
+
+const descriptionConfirmBtn = computed(() => ({
+  content: t('settings.skills.descriptionSave'),
+  loading: descriptionEditor.saving,
+  disabled: descriptionEditor.translating,
+}))
+
+function openDescriptionEditor(item: SkillCatalogItem) {
+  descriptionEditor.catalogId = item.id
+  descriptionEditor.lang = descriptionLang.value
+  descriptionEditor.text = descriptionFor(item)
+  descriptionEditor.saving = false
+  descriptionEditor.translating = false
+  descriptionEditor.visible = true
+}
+
+async function translateInEditor() {
+  if (!descriptionEditor.catalogId || descriptionEditor.translating || descriptionEditor.saving) return
+  descriptionEditor.translating = true
+  try {
+    // save=false: the translation lands in the textarea, and the operator
+    // decides whether it is worth keeping.
+    const res = await translateSkillCatalogDescription(descriptionEditor.catalogId, descriptionEditor.lang, {
+      text: descriptionEditor.text,
+    })
+    if (res?.data?.description) descriptionEditor.text = res.data.description
+  } catch (error) {
+    MessagePlugin.error(t('settings.skills.descriptionTranslateFailed'))
+  } finally {
+    descriptionEditor.translating = false
+  }
+}
+
+async function saveDescription() {
+  if (!descriptionEditor.catalogId || descriptionEditor.saving) return
+  descriptionEditor.saving = true
+  try {
+    await updateSkillCatalogDescription(
+      descriptionEditor.catalogId,
+      descriptionEditor.lang,
+      descriptionEditor.text.trim(),
+    )
+    descriptionEditor.visible = false
+    MessagePlugin.success(t('settings.skills.descriptionSaved'))
+    await loadCatalog()
+  } catch (error) {
+    MessagePlugin.error(t('settings.skills.descriptionSaveFailed'))
+  } finally {
+    descriptionEditor.saving = false
+  }
 }
 
 // Same three levels and ordering as the knowledge base, mini tool and MCP
@@ -1953,6 +2133,51 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
+// The description-language picker sits to the left of the category filter and
+// is narrower: its two labels are short, and the toolbar is teleported into
+// the toolbox header where width is scarce.
+.skill-filters__lang {
+  width: 96px;
+  flex: 0 0 96px;
+  min-width: 0;
+
+  :deep(.t-select__wrap),
+  :deep(.t-input__wrap) {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+.skill-description-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skill-description-editor__hint {
+  margin: 0;
+  font-size: var(--app-text-sm);
+  line-height: 1.5;
+  color: var(--td-text-color-secondary);
+}
+
+.skill-description-editor__input {
+  width: 100%;
+}
+
+.skill-description-editor__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.skill-description-editor__count {
+  font-size: var(--app-text-xs);
+  color: var(--td-text-color-placeholder);
+  font-variant-numeric: tabular-nums;
+}
+
 .skill-card__desc {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -1965,6 +2190,13 @@ onUnmounted(() => {
   line-height: 1.5;
   color: var(--td-text-color-secondary);
   overflow-wrap: anywhere;
+}
+
+.skill-card__desc--busy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--td-text-color-placeholder);
 }
 
 .skill-card__installs {

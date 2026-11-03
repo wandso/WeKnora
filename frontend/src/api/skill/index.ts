@@ -35,6 +35,9 @@ export interface SkillCatalogItem {
   name: string;
   version?: string;
   description?: string;
+  // Console translations of description keyed by language code. A missing
+  // entry means "not translated yet"; the card falls back to description.
+  description_i18n?: Record<string, string>;
   bundle_sha256?: string;
   created_at: string;
   updated_at: string;
@@ -139,6 +142,57 @@ export function setSkillCatalogVisibility(
 
 export function listCatalogSkillFiles(catalogId: string) {
   return get<{ data: ConfigSkillFileEntry[] }>(`/api/v1/skills/catalog/${catalogId}/files`);
+}
+
+/** Console description languages. "source" addresses the SKILL.md text. */
+export type SkillDescriptionLang = 'zh' | 'en';
+export type SkillDescriptionTarget = SkillDescriptionLang | 'source';
+
+export interface SkillCatalogDescription {
+  id: string;
+  description: string;
+  description_i18n: Record<string, string>;
+}
+
+/**
+ * Rewrites the description of one language. "source" writes the text parsed
+ * out of SKILL.md; a language code writes a console-only translation. Neither
+ * touches the stored bundle, so installed sandboxes keep their SKILL.md.
+ */
+export function updateSkillCatalogDescription(
+  catalogId: string,
+  target: SkillDescriptionTarget,
+  description: string,
+) {
+  return put<{ success: boolean; data: SkillCatalogDescription }>(
+    `/api/v1/skills/catalog/${catalogId}/description`,
+    { lang: target, description },
+  );
+}
+
+/**
+ * Machine-translates a description with the workspace's chat model. text
+ * defaults on the server to the definition's own description; save=false only
+ * returns the translation so the editor can preview it.
+ */
+export function translateSkillCatalogDescription(
+  catalogId: string,
+  lang: SkillDescriptionLang,
+  options: { text?: string; save?: boolean } = {},
+) {
+  return post<{
+    success: boolean;
+    data: {
+      lang: SkillDescriptionLang;
+      description: string;
+      saved: boolean;
+      catalog: SkillCatalogDescription;
+    };
+  }>(`/api/v1/skills/catalog/${catalogId}/translate`, {
+    lang,
+    text: options.text ?? '',
+    save: options.save ?? false,
+  }, { timeout: 2 * 60 * 1000 });
 }
 
 export function getCatalogSkillFile(catalogId: string, path: string) {
