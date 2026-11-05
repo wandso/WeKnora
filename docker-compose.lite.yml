@@ -48,3 +48,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+
+  docreader:
+    # 默认编排只 expose 50051（容器内网可达），宿主机上的 native 后端连不上。
+    # 这里额外绑到回环地址：容器之间仍走 docreader:50051，宿主机走 127.0.0.1:50051，
+    # 两种模式共用同一个 docreader，不必为 native 单独起一套解析服务。
+    ports:
+      - "127.0.0.1:50051:50051"

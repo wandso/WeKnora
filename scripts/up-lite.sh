@@ -95,6 +95,22 @@ build_image() {
   echo "==> ${name} 镜像已更新"
 }
 
+# native 模式（scripts/start-native.sh）与容器共用 data/weknora.db，
+# 同一个 SQLite 文件不能被两个进程同时写，所以起容器前先把宿主机上的后端停掉。
+stop_native() {
+  local pids
+  pids=$(netstat -ano 2>/dev/null \
+    | awk '$1=="TCP" && $2 ~ /:8080$/ && $4=="LISTENING" {print $5}' \
+    | sort -u)
+  [ -z "$pids" ] && return 0
+  echo "==> 宿主机 native 后端占用 8080（与容器共用 data/weknora.db），先停掉"
+  local pid
+  for pid in $pids; do
+    [ "$pid" = "0" ] && continue
+    taskkill //PID "$pid" //T //F >/dev/null 2>&1 || true
+  done
+}
+
 start_services() {
   local update_mode=$1
 
@@ -125,6 +141,7 @@ start_services() {
     ;;
   esac
 
+  stop_native
   "${COMPOSE[@]}" up -d "${SERVICES[@]}"
   # 无条件重启前端：app 若被重建则 IP 已变，必须重新解析（几秒，幂等）
   docker restart WeKnora-frontend >/dev/null
