@@ -1,0 +1,50 @@
+# WeKnora —— SQLite(lite) 模式 + 容器化启动
+#
+# 用途：把应用跑在 Docker 里，但沿用宿主机 ./data 目录下已有的 SQLite 数据库
+# 和文件存储，避免切换 Postgres 导致既有数据不可见。
+#
+# 用法：
+#   docker compose -p weknora-main -f docker-compose.yml -f docker-compose.lite.yml up -d redis docreader app frontend
+#   docker compose -p weknora-main -f docker-compose.yml -f docker-compose.lite.yml logs -f app
+#   docker compose -p weknora-main -f docker-compose.yml -f docker-compose.lite.yml stop
+#
+# 与默认编排的差异：
+#   1. DB_DRIVER=sqlite，数据文件挂载 ./data -> /app/data（宿主机与容器共用同一份数据）
+#   2. RETRIEVE_DRIVER=sqlite（FTS5 + sqlite-vec），不需要 pgvector
+#   3. STREAM_MANAGER_TYPE=memory（会话流走内存）
+#   4. 取消对 postgres 的启动依赖，只保留 docreader（文档解析）与 redis
+#      （准入限流注册表 newAdmissionRegistry 硬依赖 *redis.Client，缺了会 panic）
+#   5. 模型配置里的 Ollama 地址保持 127.0.0.1:11434（库内数据不动，与 native 模式一致）。
+#      容器内 127.0.0.1 指向自己，故 entrypoint 里先拉起 docker/ollama-loopback.py，
+#      把 127.0.0.1:11434 转发到 host.docker.internal:11434（宿主机 Ollama）。
+
+services:
+  app:
+    # 先起回环转发，再执行镜像原有的入口脚本（后者负责修权限、gosu 降权、启动应用）
+    # 注意：覆盖 entrypoint 后镜像的 CMD 会被 compose 清空，所以这里显式传 ./WeKnora
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        python3 /app/scripts/ollama-loopback.py >/tmp/ollama-loopback.log 2>&1 &
+        exec /app/scripts/docker-entrypoint.sh ./WeKnora
+    environment:
+      - DB_DRIVER=sqlite
+      - DB_PATH=/app/data/weknora.db
+      - RETRIEVE_DRIVER=sqlite
+      - STORAGE_TYPE=local
+      - LOCAL_STORAGE_BASE_DIR=/app/data/files
+      - STREAM_MANAGER_TYPE=memory
+      - NEO4J_ENABLE=false
+      # 模型 base_url 为 http://127.0.0.1:11434，需放行回环地址；host.docker.internal 备用
+      - SSRF_WHITELIST_EXTRA=${SSRF_WHITELIST_EXTRA:-},127.0.0.1,localhost,host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./data:/app/data
+      - ./docker/ollama-loopback.py:/app/scripts/ollama-loopback.py:ro
+    depends_on: !override
+      docreader:
+        condition: service_healthy
+      redis:
+        condition: service_started
