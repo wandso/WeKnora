@@ -67,3 +67,6 @@ miniprogram/project.private.config.json
 # Local MCP client configs (contain internal endpoints; keep out of VCS)
 .vscode/mcp.json
 .cursor/mcp.json
+
+# 本地镜像构建指纹（scripts/up-lite.sh --update 使用）
+/.docker-stamps/
