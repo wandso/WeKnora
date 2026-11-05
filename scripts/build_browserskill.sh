@@ -32,7 +32,23 @@ output_dir="$(cd "$output_dir" && pwd)"
 build_dir="$(mktemp -d /tmp/weknora-bsk-build.XXXXXX)"
 trap 'rm -rf "$build_dir"' EXIT
 
-git clone --no-checkout https://github.com/Tencent/BrowserSkill.git "$build_dir/source"
+# github.com 在部分网络下不可达（git clone 会中途 TLS 断连），先走公共镜像再回退原址。
+clone_browserskill_source() {
+  local url
+  for url in \
+    "https://ghfast.top/https://github.com/Tencent/BrowserSkill.git" \
+    "https://gh-proxy.com/https://github.com/Tencent/BrowserSkill.git" \
+    "https://github.com/Tencent/BrowserSkill.git"; do
+    echo "Cloning BrowserSkill from $url" >&2
+    if git clone --no-checkout "$url" "$build_dir/source"; then
+      return 0
+    fi
+    rm -rf "$build_dir/source"
+  done
+  echo "error: all BrowserSkill clone sources failed" >&2
+  return 1
+}
+clone_browserskill_source
 git -C "$build_dir/source" checkout --detach "$source_commit"
 (
   cd "$build_dir/source"
