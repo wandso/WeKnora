@@ -4,7 +4,7 @@ import * as vue from 'vue'
 import * as sorting from '../../utils/resourceSorting.ts'
 import { change, fixture, flush } from '../../test-utils/vueFixture.ts'
 
-function setup(t: TestContext, initialScope = 'all') {
+function setup(t: TestContext, initialScope = 'all', routerMock: Record<string, unknown> = {}) {
   const f = fixture(t)
   const fetchAgentsForList = t.mock.fn(async (_params: unknown, _force: boolean) => ({
     data: [{ id: 'agent', name: 'Updated agent' }], disabled_own_agent_ids: [],
@@ -13,7 +13,7 @@ function setup(t: TestContext, initialScope = 'all') {
     success: true, data: [{ agent: { id: 'shared-agent' } }],
   }))
   const page = f.component(new URL('./AgentList.vue', import.meta.url), {
-    'vue-router': { useRoute: () => ({ query: {} }), useRouter: () => ({}) },
+    'vue-router': { useRoute: () => ({ query: {} }), useRouter: () => routerMock },
     'vue-i18n': { useI18n: () => ({ t: (key: string) => key }) },
     'tdesign-vue-next': { MessagePlugin: {} },
     '@/stores/auth': { useAuthStore: () => ({ hasRole: () => true }) },
@@ -27,7 +27,7 @@ function setup(t: TestContext, initialScope = 'all') {
     '@/components/settings/useConfirmDelete': { useConfirmDelete: () => ({}) },
     '@/composables/useTenantModelReadiness': { useTenantModelReadiness: () => ({ loaded: vue.ref(true), isReadyForAgent: vue.ref(true) }) },
     '@/composables/useListUrlState': { useListUrlState: () => ({ scope: vue.ref(initialScope), creator: vue.ref('all'), query: vue.ref('') }) },
-    '@/composables/useResourcePins': { useResourcePins: () => ({ favorites: vue.ref([]), recents: vue.ref([]) }) },
+    '@/composables/useResourcePins': { useResourcePins: () => ({ favorites: vue.ref([]), recents: vue.ref([]), touchRecent() {} }) },
     '@/composables/useAssistantPageContext': { useAssistantPageContext() {} },
     '@/stores/assistant': { useAssistantStore: () => ({ pageAccess: true }) },
     '@/api/agent': {}, '@/api/chat/index': {}, '@/api/organization': { listOrganizationSharedAgents },
@@ -112,4 +112,26 @@ test('the original create entry opens the configuration form directly', async t 
   assert.equal(f.vm.editorMode, 'create')
   assert.equal(f.vm.editorInitialSection, 'basic')
   assert.equal(f.vm.editingAgent, null)
+})
+
+// 卡片右下角的「对话」按钮：直接落到新对话页并把智能体写进 URL，
+// 用户在输入框里就已经是它，不用先进对话再手动切换。
+test('card chat action opens a new chat already scoped to that agent', async t => {
+  const push = t.mock.fn()
+  const f = setup(t, 'all', { push })
+  await flush()
+
+  f.vm.handleStartChat('agent-one')
+  assert.equal(push.mock.calls[0]?.arguments[0].path, '/platform/creatChat')
+  assert.deepEqual({ ...push.mock.calls[0]?.arguments[0].query }, { agent_id: 'agent-one' })
+
+  // 共享智能体还要带上源空间，否则对话侧拿不到它的配置。
+  f.vm.handleStartChat('shared-agent', 'tenant-2')
+  assert.deepEqual({ ...push.mock.calls[1]?.arguments[0].query }, {
+    agent_id: 'shared-agent',
+    source_tenant_id: 'tenant-2',
+  })
+
+  f.vm.handleStartChat(undefined)
+  assert.equal(push.mock.callCount(), 2)
 })

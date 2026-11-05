@@ -8419,6 +8419,7 @@ export default {
     disable: '停用',
     enable: '启用',
     noDescription: '暂无描述',
+    startChat: '对话',
     selectAgent: '选择智能体',
     noAgents: '暂无智能体',
     manageAgents: '管理',

@@ -8256,6 +8256,7 @@ export default {
     disable: '停用',
     enable: '啟用',
     noDescription: '暫無描述',
+    startChat: '對話',
     selectAgent: '選擇智慧代理',
     noAgents: '暫無智慧代理',
     manageAgents: '管理',

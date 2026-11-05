@@ -1594,6 +1594,7 @@ export default {
     disable: '無効化',
     enable: '有効化',
     noDescription: '説明なし',
+    startChat: 'チャット',
     selectAgent: 'エージェントを選択',
     noAgents: 'エージェントがありません',
     manageAgents: '管理',

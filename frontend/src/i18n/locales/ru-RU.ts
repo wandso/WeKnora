@@ -8255,6 +8255,7 @@ export default {
     disable: 'Disable',
     enable: 'Enable',
     noDescription: 'No description',
+    startChat: 'Чат',
     selectAgent: 'Select Agent',
     noAgents: 'No agents',
     manageAgents: 'Manage',

@@ -105,6 +105,20 @@ const deploymentCapabilities = useDeploymentCapabilitiesStore();
 const { t } = useI18n();
 const { navigateToKnowledgeBaseList } = useKnowledgeBaseCreationNavigation();
 
+// 深链预选智能体：/platform/creatChat?agent_id=xxx[&source_tenant_id=yyy]
+// 智能体卡片上的「对话」按钮、全局命令面板都走这条路径，进入新对话页时
+// 输入框里就已经是该智能体，不用再打开下拉手动切换。
+const applyPresetAgentFromQuery = () => {
+    const agentId = route.query.agent_id ? String(route.query.agent_id) : '';
+    if (!agentId) return;
+    const sourceTenantId = route.query.source_tenant_id ? String(route.query.source_tenant_id) : null;
+    settingsStore.selectAgent(agentId, sourceTenantId);
+    // 预选只作用一次，避免刷新页面时把用户后来改过的选择又覆盖回去。
+    const { agent_id: _agentId, source_tenant_id: _sourceTenantId, ...rest } = route.query;
+    void router.replace({ path: route.path, query: rest });
+};
+applyPresetAgentFromQuery();
+
 const hostSandboxEnabled = computed(() =>
     shouldRenderHostProjectSettings(deploymentCapabilities.isSupported('settings.sandbox.host')),
 );

@@ -269,17 +269,27 @@
                     </t-tooltip>
                   </div>
                 </div>
-                <!-- 右下角：内置 / 来源徽章 / 空间图标+名称 -->
-                <div v-if="!agent.isMine" class="card-bottom-source">
-                  <t-icon name="usergroup" class="org-icon" size="14px" aria-hidden="true" />
-                  <span class="org-source-text">{{ agent.org_name }}</span>
+                <div class="card-bottom-right">
+                  <!-- 右下角：内置 / 来源徽章 / 空间图标+名称 -->
+                  <div v-if="!agent.isMine" class="card-bottom-source">
+                    <t-icon name="usergroup" class="org-icon" size="14px" aria-hidden="true" />
+                    <span class="org-source-text">{{ agent.org_name }}</span>
+                  </div>
+                  <div v-else-if="showAgentBuiltinBadge(agent)" class="builtin-badge">
+                    <t-icon name="lock-on" size="12px" />
+                    <span>{{ $t('agent.builtin') }}</span>
+                  </div>
+                  <ResourceOriginBadge v-else-if="showAgentOriginBadge(agent)" :variant="agentOriginVariant(agent)"
+                    :creator-name="(agent as any).creator_name" />
+                  <!-- 一键带着该智能体进入对话，省去「先去对话再选智能体」的两步 -->
+                  <t-tooltip v-if="!agent.disabled_by_me" :content="$t('agent.detail.useInChat')" placement="top">
+                    <button type="button" class="agent-chat-btn" :aria-label="$t('agent.detail.useInChat')"
+                      @click.stop="handleStartChat(agent.id, agent.isMine ? null : agent.source_tenant_id)">
+                      <t-icon name="chat-bubble" size="13px" aria-hidden="true" />
+                      <span class="agent-chat-btn-text">{{ $t('agent.startChat') }}</span>
+                    </button>
+                  </t-tooltip>
                 </div>
-                <div v-else-if="showAgentBuiltinBadge(agent)" class="builtin-badge">
-                  <t-icon name="lock-on" size="12px" />
-                  <span>{{ $t('agent.builtin') }}</span>
-                </div>
-                <ResourceOriginBadge v-else-if="showAgentOriginBadge(agent)" :variant="agentOriginVariant(agent)"
-                  :creator-name="(agent as any).creator_name" />
               </div>
             </div>
           </template>
@@ -434,13 +444,22 @@
                     </t-tooltip>
                   </div>
                 </div>
-                <!-- 右下角：内置 / 来源徽章（我创建 / 同空间其他成员） -->
-                <div v-if="showAgentBuiltinBadge(agent)" class="builtin-badge">
-                  <t-icon name="lock-on" size="12px" />
-                  <span>{{ $t('agent.builtin') }}</span>
+                <div class="card-bottom-right">
+                  <!-- 右下角：内置 / 来源徽章（我创建 / 同空间其他成员） -->
+                  <div v-if="showAgentBuiltinBadge(agent)" class="builtin-badge">
+                    <t-icon name="lock-on" size="12px" />
+                    <span>{{ $t('agent.builtin') }}</span>
+                  </div>
+                  <ResourceOriginBadge v-else-if="showAgentOriginBadge(agent)" :variant="agentOriginVariant(agent)"
+                    :creator-name="(agent as any).creator_name" />
+                  <t-tooltip v-if="!agent.disabled_by_me" :content="$t('agent.detail.useInChat')" placement="top">
+                    <button type="button" class="agent-chat-btn" :aria-label="$t('agent.detail.useInChat')"
+                      @click.stop="handleStartChat(agent.id)">
+                      <t-icon name="chat-bubble" size="13px" aria-hidden="true" />
+                      <span class="agent-chat-btn-text">{{ $t('agent.startChat') }}</span>
+                    </button>
+                  </t-tooltip>
                 </div>
-                <ResourceOriginBadge v-else-if="showAgentOriginBadge(agent)" :variant="agentOriginVariant(agent)"
-                  :creator-name="(agent as any).creator_name" />
               </div>
             </div>
           </template>
@@ -564,6 +583,16 @@
                       <div class="feature-badge multi-turn"><t-icon name="chat-bubble" size="14px" /></div>
                     </t-tooltip>
                   </div>
+                </div>
+                <div class="card-bottom-right">
+                  <t-tooltip v-if="!shared.disabled_by_me && shared.agent?.id" :content="$t('agent.detail.useInChat')"
+                    placement="top">
+                    <button type="button" class="agent-chat-btn" :aria-label="$t('agent.detail.useInChat')"
+                      @click.stop="handleStartChat(shared.agent?.id, shared.source_tenant_id)">
+                      <t-icon name="chat-bubble" size="13px" aria-hidden="true" />
+                      <span class="agent-chat-btn-text">{{ $t('agent.startChat') }}</span>
+                    </button>
+                  </t-tooltip>
                 </div>
               </div>
             </div>
@@ -1214,6 +1243,20 @@ onUnmounted(() => {
   window.removeEventListener('openAgentEditor', handleOpenAgentEditor as EventListener)
 })
 
+/**
+ * 卡片上的「对话」按钮：带着该智能体直接进入对话。
+ * 落到新对话页并把 agent_id（共享智能体再加上源空间）写进 URL，
+ * 由 creatChat 侧预选，避免用户先进对话、再手动挑智能体。
+ */
+const handleStartChat = (agentId?: string, sourceTenantId?: number | string | null) => {
+  if (!agentId) return
+  pins.touchRecent('agent', agentId)
+  const query: Record<string, string> = { agent_id: agentId }
+  const tenantId = sourceTenantId != null && sourceTenantId !== '' ? String(sourceTenantId) : ''
+  if (tenantId) query.source_tenant_id = tenantId
+  router.push({ path: '/platform/creatChat', query })
+}
+
 const handleCardClick = (agent: DisplayAgent | AgentWithUI) => {
   if (openMoreAgentId.value === agent.id) return
   // Track recency before any branch — Recents should reflect what the
@@ -1738,6 +1781,71 @@ watch(keyword, () => { collapsedAgentSections.value = new Set() })
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+// 底部右侧：来源徽章 + 「对话」按钮。margin-left:auto 让换行后仍贴右。
+.card-bottom-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-left: auto;
+  flex-shrink: 1;
+
+  // 多了按钮之后，空间名过长时要能省略，否则整行会撑破卡片。
+  .card-bottom-source {
+    min-width: 0;
+    flex-shrink: 1;
+  }
+
+  .org-source-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+// 卡片级入口：带着该智能体进入对话，样式上做成可点击的小胶囊，
+// 与只读的能力徽章（feature-badge）区分开。
+.agent-chat-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 22px;
+  padding: 0 7px;
+  box-sizing: border-box;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: var(--app-radius-sm);
+  background: transparent;
+  color: var(--td-text-color-secondary);
+  font-family: var(--app-font-family);
+  font-size: var(--app-text-xs);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--app-motion-fast) ease, border-color var(--app-motion-fast) ease,
+    background var(--app-motion-fast) ease;
+
+  .t-icon {
+    flex-shrink: 0;
+  }
+
+  &:hover {
+    color: var(--td-brand-color);
+    border-color: var(--td-brand-color);
+    background: var(--td-bg-color-container-hover);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--td-brand-color);
+    outline-offset: 1px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 }
 
 // Card capability icons share the knowledge-base list's quiet treatment.
