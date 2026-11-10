@@ -148,6 +148,15 @@ type ConversationConfig struct {
 	EnableRerank         bool           `yaml:"enable_rerank"                    json:"enable_rerank"`
 	Summary              *SummaryConfig `yaml:"summary"                          json:"summary"`
 
+	// PassageGate shrinks the rerank candidate pool with one cheap judge call
+	// before every candidate reaches the rerank model. Off by default: it adds
+	// a model request, so enable it only after measuring the trade-off.
+	PassageGateEnabled       bool   `yaml:"passage_gate_enabled"        json:"passage_gate_enabled"`
+	PassageGateModelID       string `yaml:"passage_gate_model_id"       json:"passage_gate_model_id"`
+	PassageGateMinCandidates int    `yaml:"passage_gate_min_candidates" json:"passage_gate_min_candidates"`
+	PassageGateKeep          int    `yaml:"passage_gate_keep"           json:"passage_gate_keep"`
+	PassageGateTimeoutMS     int    `yaml:"passage_gate_timeout_ms"     json:"passage_gate_timeout_ms"`
+
 	// Prompt template ID fields — resolved to text by backfillConversationDefaults
 	FallbackPromptID             string `yaml:"fallback_prompt_id"                json:"fallback_prompt_id"`
 	RewritePromptID              string `yaml:"rewrite_prompt_id"                 json:"rewrite_prompt_id"`
@@ -716,6 +725,15 @@ func ValidateConfig(cfg *Config) error {
 		}
 		if cfg.Conversation.RerankThreshold < -10 || cfg.Conversation.RerankThreshold > 10 {
 			errs = append(errs, "conversation.rerank_threshold must be between -10 and 10")
+		}
+		if cfg.Conversation.PassageGateMinCandidates < 0 {
+			errs = append(errs, "conversation.passage_gate_min_candidates must be >= 0")
+		}
+		if cfg.Conversation.PassageGateKeep < 0 {
+			errs = append(errs, "conversation.passage_gate_keep must be >= 0")
+		}
+		if cfg.Conversation.PassageGateTimeoutMS < 0 {
+			errs = append(errs, "conversation.passage_gate_timeout_ms must be >= 0")
 		}
 	}
 

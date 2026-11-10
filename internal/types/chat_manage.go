@@ -43,6 +43,10 @@ type PipelineRequest struct {
 	RerankTopK      int     `json:"rerank_top_k"`
 	RerankThreshold float64 `json:"rerank_threshold"`
 
+	// PassageGate shrinks the candidate pool with one cheap judge call before
+	// rerank. Runtime only: it never changes the request or response contract.
+	PassageGate PassageGateSettings `json:"-"`
+
 	// ChatModelTenantID is set internally after authorizing the source KB.
 	// It scopes only ChatModelID lookups, never retrieval or message storage.
 	ChatModelTenantID uint64 `json:"-"`
@@ -228,6 +232,8 @@ type PipelineState struct {
 	UsedMemories UsedMemories `json:"-"`
 	// RerankDiagnostics records what the rerank stage did this turn.
 	RerankDiagnostics *RerankDiagnostics `json:"-"`
+	// PassageGateDiagnostics records what the pre-rerank gate did this turn.
+	PassageGateDiagnostics *PassageGateDiagnostics `json:"-"`
 }
 
 // PipelineContext holds runtime context for the current pipeline execution.
@@ -333,6 +339,7 @@ func (c *ChatManage) Clone() *ChatManage {
 			RerankModelID:            c.RerankModelID,
 			RerankTopK:               c.RerankTopK,
 			RerankThreshold:          c.RerankThreshold,
+			PassageGate:              c.PassageGate,
 			ChatModelID:              c.ChatModelID,
 			ChatModelTenantID:        c.ChatModelTenantID,
 			SummaryConfig:            c.SummaryConfig,

@@ -25,6 +25,20 @@ type RetrievalConfig struct {
 	// RerankModelID is the ID of the rerank model to use (required for search)
 	RerankModelID string `json:"rerank_model_id"`
 
+	// PassageGateEnabled turns on the pre-rerank relevance gate: one cheap
+	// judge call trims the candidate pool before every candidate is sent to
+	// the rerank model. Off by default; measure before enabling.
+	PassageGateEnabled bool `json:"passage_gate_enabled,omitempty"`
+	// PassageGateModelID is the judge model. Empty falls back to the
+	// query-understanding model, then the chat model used for the request.
+	PassageGateModelID string `json:"passage_gate_model_id,omitempty"`
+	// PassageGateMinCandidates skips the gate for pools at or below this size.
+	PassageGateMinCandidates int `json:"passage_gate_min_candidates,omitempty"`
+	// PassageGateKeep is the floor handed to rerank. 0 uses the default.
+	PassageGateKeep int `json:"passage_gate_keep,omitempty"`
+	// PassageGateTimeoutMS bounds the judge call. 0 uses the default.
+	PassageGateTimeoutMS int `json:"passage_gate_timeout_ms,omitempty"`
+
 	// RRFK is the smoothing constant of Reciprocal Rank Fusion. Larger values
 	// flatten the curve, reducing the bias towards top-1 results.
 	// Default: 60. Sensible range: 30..100 depending on corpus size.

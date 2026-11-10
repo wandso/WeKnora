@@ -252,6 +252,7 @@ func (e *EvaluationService) Evaluation(ctx context.Context,
 				RerankModelID:    rerankModelID,
 				RerankTopK:       e.config.Conversation.RerankTopK,
 				RerankThreshold:  e.config.Conversation.RerankThreshold,
+				PassageGate:      passageGateFromConversation(e.config.Conversation),
 				ChatModelID:      chatModelID,
 				SummaryConfig: types.SummaryConfig{
 					MaxTokens:           e.config.Conversation.Summary.MaxTokens,

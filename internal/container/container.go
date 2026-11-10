@@ -584,6 +584,9 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	logger.Debugf(ctx, "[Container] Knowledge housekeeping runner registered")
 	must(container.Provide(chatpipeline.NewEventManager))
 	must(container.Invoke(chatpipeline.NewPluginSearch))
+	// The gate must be registered before rerank: CHUNK_RERANK plugins run in
+	// registration order, and the gate has to see the pool rerank would get.
+	must(container.Invoke(chatpipeline.NewPluginPassageGate))
 	must(container.Invoke(chatpipeline.NewPluginRerank))
 	must(container.Invoke(chatpipeline.NewPluginWebFetch))
 	must(container.Invoke(chatpipeline.NewPluginMerge))
