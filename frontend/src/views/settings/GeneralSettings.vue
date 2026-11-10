@@ -42,8 +42,9 @@
             :placeholder="$t('theme.selectTheme')"
             @change="handleThemeChange"
           >
-            <t-option value="light" :label="$t('theme.light')">{{ $t('theme.light') }}</t-option>
-            <t-option value="dark" :label="$t('theme.dark')">{{ $t('theme.dark') }}</t-option>
+            <t-option value="light" :label="$t('theme.dayMode')">{{ $t('theme.dayMode') }}</t-option>
+            <t-option value="dark" :label="$t('theme.nightMode')">{{ $t('theme.nightMode') }}</t-option>
+            <t-option value="eye" :label="$t('theme.eyeMode')">{{ $t('theme.eyeMode') }}</t-option>
             <t-option value="system" :label="$t('theme.system')">{{ $t('theme.system') }}</t-option>
           </t-select>
         </div>

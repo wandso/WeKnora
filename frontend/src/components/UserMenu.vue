@@ -91,6 +91,16 @@
             :title="$t('tenant.switcher.menuLabel')" />
         </div>
         <div class="menu-divider"></div>
+        <!-- 外观模式：白天 / 夜间 / 护眼 三态并排，点一下即生效，不关闭菜单，
+             方便在同一下拉里对比观感。 -->
+        <div class="dropdown-appearance">
+          <div class="dropdown-appearance-title">
+            <t-icon name="palette" class="menu-icon" />
+            <span>{{ $t('theme.appearance') }}</span>
+          </div>
+          <ThemeModeSwitch />
+        </div>
+        <div class="menu-divider"></div>
         <!-- 账号与空间是头像菜单的核心上下文；基础设施类配置统一收进「全部设置」。 -->
         <div class="menu-item" @click="handleQuickNav('general')">
           <t-icon name="user" class="menu-icon" />
@@ -224,6 +234,7 @@ import { logout as logoutApi } from '@/api/auth'
 import { useI18n } from 'vue-i18n'
 import CreateTenantDialog from '@/components/CreateTenantDialog.vue'
 import GlobalInvitationBell from '@/components/GlobalInvitationBell.vue'
+import ThemeModeSwitch from '@/components/ThemeModeSwitch.vue'
 import {
   navigateAfterTenantSwitch,
   persistLastActiveTenantPreference,
@@ -968,6 +979,26 @@ onUnmounted(() => {
     .dropdown-tenant-panel-role-icon {
       flex-shrink: 0;
       color: inherit;
+    }
+  }
+}
+
+// 下拉 — 外观模式：标题行与菜单项同缩进，三态切换器占满余下宽度
+.dropdown-appearance {
+  padding: 8px 12px 10px;
+
+  .dropdown-appearance-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+    font-size: var(--app-text-sm);
+    color: var(--td-text-color-secondary);
+
+    .menu-icon {
+      flex-shrink: 0;
+      font-size: var(--app-text-xl);
+      color: var(--td-text-color-secondary);
     }
   }
 }

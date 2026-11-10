@@ -296,3 +296,75 @@ select:-webkit-autofill {
     --z-popover: 3000;
     --z-toast: 5000;
 }
+
+/* ============================================================
+ * 护眼模式（html[data-vision="eye"]）
+ * 以 TDesign light 为基底，只把灰阶 / 背景 / 文字换成"暖纸感"调色板：
+ * 去掉纯白高亮面，降低蓝光比例，同时保住正文对比度（WCAG AA）。
+ * 由 composables/useTheme.ts 在护眼模式下打上该属性，其它模式自动摘除。
+ * ============================================================ */
+:root:root[data-vision="eye"] {
+    /* 暖灰阶：14 级由浅到深，供 TDesign 组件内部直接引用 */
+    --td-gray-color-1: #f6f2e6;
+    --td-gray-color-2: #eae4d0;
+    --td-gray-color-3: #e7e0cb;
+    --td-gray-color-4: #dcd3b9;
+    --td-gray-color-5: #cbc0a3;
+    --td-gray-color-6: #b0a689;
+    --td-gray-color-7: #968b72;
+    --td-gray-color-8: #7f7660;
+    --td-gray-color-9: #6a6250;
+    --td-gray-color-10: #554f41;
+    --td-gray-color-11: #453f34;
+    --td-gray-color-12: #37322a;
+    --td-gray-color-13: #2c2822;
+    --td-gray-color-14: #201d18;
+
+    /* 背景：页面像米色纸张，容器是略亮的纸面，不再出现纯白大色块 */
+    --td-bg-color-page: #eae4d0;
+    --td-bg-color-container: #faf7ec;
+    --td-bg-color-container-hover: #f3eedd;
+    --td-bg-color-container-active: #e8e2cd;
+    --td-bg-color-container-select: #faf7ec;
+    --td-bg-color-secondarycontainer: #f2eddd;
+    --td-bg-color-secondarycontainer-hover: #ebe5d2;
+    --td-bg-color-secondarycontainer-active: #e3dcc5;
+    --td-bg-color-component: #e6dfc9;
+    --td-bg-color-component-hover: #ded6be;
+    --td-bg-color-component-active: #d3c9ad;
+    --td-bg-color-component-disabled: #efeada;
+    --td-bg-color-sidebar: #f4efdf;
+    --td-bg-color-settings-modal: #f4efdf;
+    --td-component-stroke: #ded6bf;
+    --td-component-border: #d2c7aa;
+
+    /* 文字：深棕灰替代纯黑，降低纸面上的眩光 */
+    --td-font-gray-1: rgba(56, 50, 38, 0.92);
+    --td-font-gray-2: rgba(56, 50, 38, 0.7);
+    --td-font-gray-3: rgba(56, 50, 38, 0.46);
+    --td-font-gray-4: rgba(56, 50, 38, 0.28);
+    --td-text-color-primary: var(--td-font-gray-1);
+    --td-text-color-secondary: var(--td-font-gray-2);
+    --td-text-color-placeholder: var(--td-font-gray-3);
+    --td-text-color-disabled: var(--td-font-gray-4);
+
+    /* 品牌浅色底也偏暖，避免绿色选中块在米色背景上发青 */
+    --td-brand-color-1: #eaf4e4;
+    --td-brand-color-light: var(--td-brand-color-1);
+    --td-brand-color-disabled: #b9d8ac;
+
+    /* 引用高亮在暖底上略降饱和，保持"纸面荧光笔"观感 */
+    --app-source-highlight-bg: rgba(228, 176, 63, 0.3);
+    --app-source-highlight-soft-bg: rgba(228, 176, 63, 0.1);
+}
+
+/* 护眼模式的滚动条：暖灰，别在米色侧栏上留一道冷灰 */
+:root:root[data-vision="eye"] *::-webkit-scrollbar-thumb {
+    background-color: #cbc0a3;
+}
+:root:root[data-vision="eye"] *::-webkit-scrollbar-thumb:hover {
+    background-color: #b0a689;
+}
+:root:root[data-vision="eye"] *::-webkit-scrollbar-track {
+    background-color: transparent;
+}

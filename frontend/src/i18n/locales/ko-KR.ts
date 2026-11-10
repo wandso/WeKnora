@@ -4234,7 +4234,15 @@ export default {
     light: '라이트',
     dark: '다크',
     system: '시스템 설정',
-    selectTheme: '테마 선택'
+    selectTheme: '테마 선택',
+    appearance: '화면 모드',
+    dayMode: '주간',
+    nightMode: '야간',
+    eyeMode: '눈 편안 모드',
+    eyeModeShort: '눈 편안',
+    dayModeTip: '주간 모드: 밝고 선명하게',
+    nightModeTip: '야간 모드: 어둡고 눈부시지 않게',
+    eyeModeTip: '눈 편안 모드: 따뜻한 종이색으로 블루라이트를 줄입니다'
   },
   general: {
     title: '일반 설정',

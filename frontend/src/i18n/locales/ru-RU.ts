@@ -4227,7 +4227,15 @@ export default {
     light: 'Светлая',
     dark: 'Тёмная',
     system: 'Системная',
-    selectTheme: 'Выбрать тему'
+    selectTheme: 'Выбрать тему',
+    appearance: 'Режим экрана',
+    dayMode: 'День',
+    nightMode: 'Ночь',
+    eyeMode: 'Защита зрения',
+    eyeModeShort: 'Зрение',
+    dayModeTip: 'Дневной режим: яркий и чёткий',
+    nightModeTip: 'Ночной режим: тёмный, без слепящей яркости',
+    eyeModeTip: 'Режим защиты зрения: тёплый бумажный фон, меньше синего света'
   },
   general: {
     title: 'Общие настройки',

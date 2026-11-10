@@ -4236,7 +4236,15 @@ export default {
     light: '浅色',
     dark: '深色',
     system: '跟随系统',
-    selectTheme: '选择主题'
+    selectTheme: '选择主题',
+    appearance: '外观模式',
+    dayMode: '白天',
+    nightMode: '夜间',
+    eyeMode: '护眼模式',
+    eyeModeShort: '护眼',
+    dayModeTip: '白天模式：清爽明亮',
+    nightModeTip: '夜间模式：暗色低亮',
+    eyeModeTip: '护眼模式：暖色纸感，降低蓝光'
   },
   general: {
     title: '常规设置',

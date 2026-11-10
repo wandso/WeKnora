@@ -5859,7 +5859,15 @@ export default {
       light: 'ライト',
       dark: 'ダーク',
       system: 'システムに従う',
-      selectTheme: 'テーマを選択'
+      selectTheme: 'テーマを選択',
+      appearance: '表示モード',
+      dayMode: '昼間',
+      nightMode: '夜間',
+      eyeMode: 'アイケアモード',
+      eyeModeShort: 'アイケア',
+      dayModeTip: '昼間モード：明るくクリア',
+      nightModeTip: '夜間モード：暗くまぶしくない',
+      eyeModeTip: 'アイケアモード：暖色の紙面でブルーライトを抑えます'
     },
     font: {
       uiFont: 'インターフェースフォント',

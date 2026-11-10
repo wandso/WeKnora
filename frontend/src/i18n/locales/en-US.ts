@@ -5998,7 +5998,15 @@ export default {
       light: 'Light',
       dark: 'Dark',
       system: 'Follow System',
-      selectTheme: 'Select theme'
+      selectTheme: 'Select theme',
+      appearance: 'Appearance',
+      dayMode: 'Day',
+      nightMode: 'Night',
+      eyeMode: 'Eye care mode',
+      eyeModeShort: 'Eye care',
+      dayModeTip: 'Day mode: bright and crisp',
+      nightModeTip: 'Night mode: dark and low-brightness',
+      eyeModeTip: 'Eye care mode: warm paper tone with less blue light'
     },
     font: {
       uiFont: 'Interface Font',

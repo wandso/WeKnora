@@ -4229,7 +4229,15 @@ export default {
     light: '淺色',
     dark: '深色',
     system: '跟隨系統',
-    selectTheme: '選擇主題'
+    selectTheme: '選擇主題',
+    appearance: '外觀模式',
+    dayMode: '白天',
+    nightMode: '夜間',
+    eyeMode: '護眼模式',
+    eyeModeShort: '護眼',
+    dayModeTip: '白天模式：清爽明亮',
+    nightModeTip: '夜間模式：暗色低亮',
+    eyeModeTip: '護眼模式：暖色紙感，降低藍光'
   },
   general: {
     title: '常規設定',
