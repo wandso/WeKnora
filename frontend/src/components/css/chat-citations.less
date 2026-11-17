@@ -99,7 +99,9 @@
 }
 
 .chat-citation-float {
-  position: absolute;
+  // fixed 而非 absolute：浮层挂在 body 上，absolute 会把文档撑高，
+  // 打开/关闭时滚动条闪现，导致页面与浮层整体位移一下。
+  position: fixed;
   z-index: 10000;
   box-sizing: border-box;
   width: 300px;
@@ -198,10 +200,10 @@
   }
 }
 
+// 只淡入，不做位移：浮层紧贴引用标签出现，任何 translate 都会被看成“窗口跳了一下”
 @keyframes chat-citation-float-in {
   from {
     opacity: 0;
-    transform: translateY(-4px);
   }
 }
 

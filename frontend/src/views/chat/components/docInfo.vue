@@ -367,14 +367,14 @@ const getWebSearchDisplayText = (item) => {
     overflow: hidden;
     text-overflow: ellipsis;
     line-height: 20px;
-    padding: 2px 0;
-    transition: all var(--app-motion-base) ease;
+    // 右边距留在常态里，hover 只换底色，避免悬停时盒子变宽把整行推一下
+    padding: 2px 4px 2px 0;
+    transition: background-color var(--app-motion-base) ease, color var(--app-motion-base) ease;
     border-bottom: 1px dashed var(--td-brand-color);
 
     &:hover {
         background-color: var(--refer-brand-8);
         border-radius: 3px;
-        padding-right: 4px;
     }
 
     &.doc-web {

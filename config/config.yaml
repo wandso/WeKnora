@@ -29,7 +29,9 @@ conversation:
     max_input_chars: 8192
     repeat_penalty: 1.0
     temperature: 0.3
-    max_completion_tokens: 1024
+    # Fallback budget for sessions with no custom agent. A custom agent's own
+    # max_completion_tokens wins over this value (session_qa_helpers.go).
+    max_completion_tokens: 2048
     no_match_prefix: |-
       <think>
       </think>

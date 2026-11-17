@@ -76,8 +76,18 @@ export function useCitationPopover(rootRef: Ref<HTMLElement | null>, options: Ci
     }, options.getKnowledgeReferences?.()) || raw
   }
 
+  // Chat floats are positioned:fixed (see chat-citations.less). Using viewport
+  // coordinates keeps them out of the document's scroll box: an absolutely
+  // positioned float pinned near the bottom of the page extends <body> while it
+  // is open, so the scrollbar appearing/disappearing shifted the whole page on
+  // every hover in and out.
   const positionFor = (el: HTMLElement, offsetY = 0) => {
     const rect = el.getBoundingClientRect()
+    if (isChat) {
+      float.value.top = rect.bottom + 6 + offsetY
+      float.value.left = Math.max(8, Math.min(rect.left, window.innerWidth - 320))
+      return
+    }
     float.value.top = rect.bottom + window.scrollY + 6 + offsetY
     float.value.left = Math.min(rect.left + window.scrollX, window.innerWidth - 320)
   }
