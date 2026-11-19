@@ -98,7 +98,7 @@
             <t-icon name="palette" class="menu-icon" />
             <span>{{ $t('theme.appearance') }}</span>
           </div>
-          <ThemeModeSwitch />
+          <ThemeModeSwitch @pick-accent="accentDialogVisible = true" />
         </div>
         <div class="menu-divider"></div>
         <!-- 账号与空间是头像菜单的核心上下文；基础设施类配置统一收进「全部设置」。 -->
@@ -221,6 +221,8 @@
 
     <!-- 创建工作区弹窗 -->
     <CreateTenantDialog v-model:visible="createTenantDialogVisible" @created="onTenantCreated" />
+    <!-- 取色弹窗放在下拉之外：菜单关闭时它仍需存活 -->
+    <AccentColorDialog v-model:visible="accentDialogVisible" />
   </div>
 </template>
 
@@ -235,6 +237,7 @@ import { useI18n } from 'vue-i18n'
 import CreateTenantDialog from '@/components/CreateTenantDialog.vue'
 import GlobalInvitationBell from '@/components/GlobalInvitationBell.vue'
 import ThemeModeSwitch from '@/components/ThemeModeSwitch.vue'
+import AccentColorDialog from '@/components/AccentColorDialog.vue'
 import {
   navigateAfterTenantSwitch,
   persistLastActiveTenantPreference,
@@ -289,6 +292,7 @@ const canManageModels = computed(() =>
 const menuRef = ref<HTMLElement>()
 const tenantMenuItemRef = ref<HTMLElement>()
 const menuVisible = ref(false)
+const accentDialogVisible = ref(false)
 const tenantSubmenuOpen = ref(false)
 const tenantSubmenuStyle = ref<Record<string, string>>({})
 let tenantSubmenuHideTimer: ReturnType<typeof setTimeout> | null = null

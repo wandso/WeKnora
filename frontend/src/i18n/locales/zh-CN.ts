@@ -4248,7 +4248,17 @@ export default {
     eyeModeShort: '护眼',
     dayModeTip: '白天模式：清爽明亮',
     nightModeTip: '夜间模式：暗色低亮',
-    eyeModeTip: '护眼模式：暖色纸感，降低蓝光'
+    eyeModeTip: '护眼模式：暖色纸感，降低蓝光',
+    customColorShort: '取色',
+    customColorTip: '自定义主题色：白天、夜间、护眼模式都生效',
+    customColorTitle: '自定义主题色',
+    customColorDescription: '选择一种颜色作为界面品牌色，系统会据此生成明暗两套色阶，对所有外观模式生效。',
+    customColorPreview: '预览',
+    customColorPick: '选择颜色',
+    customColorPresets: '推荐颜色',
+    customColorLowContrast: '这个颜色过亮或过暗，部分文字可能不易辨认。',
+    customColorReset: '恢复默认颜色',
+    customColorHint: '仅保存在本机当前账号'
   },
   general: {
     title: '常规设置',

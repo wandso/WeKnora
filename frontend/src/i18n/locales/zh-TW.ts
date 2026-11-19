@@ -4241,7 +4241,17 @@ export default {
     eyeModeShort: '護眼',
     dayModeTip: '白天模式：清爽明亮',
     nightModeTip: '夜間模式：暗色低亮',
-    eyeModeTip: '護眼模式：暖色紙感，降低藍光'
+    eyeModeTip: '護眼模式：暖色紙感，降低藍光',
+    customColorShort: '取色',
+    customColorTip: '自訂主題色：白天、夜間、護眼模式都生效',
+    customColorTitle: '自訂主題色',
+    customColorDescription: '選擇一種顏色作為介面品牌色，系統會據此產生明暗兩套色階，對所有外觀模式生效。',
+    customColorPreview: '預覽',
+    customColorPick: '選擇顏色',
+    customColorPresets: '推薦顏色',
+    customColorLowContrast: '這個顏色過亮或過暗，部分文字可能不易辨識。',
+    customColorReset: '恢復預設顏色',
+    customColorHint: '僅儲存在本機目前帳號'
   },
   general: {
     title: '常規設定',

@@ -4246,7 +4246,17 @@ export default {
     eyeModeShort: '눈 편안',
     dayModeTip: '주간 모드: 밝고 선명하게',
     nightModeTip: '야간 모드: 어둡고 눈부시지 않게',
-    eyeModeTip: '눈 편안 모드: 따뜻한 종이색으로 블루라이트를 줄입니다'
+    eyeModeTip: '눈 편안 모드: 따뜻한 종이색으로 블루라이트를 줄입니다',
+    customColorShort: '색상',
+    customColorTip: '사용자 지정 색상: 주간·야간·눈 편안 모드 모두에 적용됩니다',
+    customColorTitle: '사용자 지정 테마 색상',
+    customColorDescription: '인터페이스 강조 색상을 선택하세요. 밝기별 색상표를 자동 생성하며 모든 화면 모드에 적용됩니다.',
+    customColorPreview: '미리보기',
+    customColorPick: '색상 선택',
+    customColorPresets: '추천 색상',
+    customColorLowContrast: '이 색상은 너무 밝거나 어두워 글자가 읽기 어려울 수 있습니다.',
+    customColorReset: '기본 색상으로 복원',
+    customColorHint: '현재 계정의 이 기기에만 저장됩니다'
   },
   general: {
     title: '일반 설정',

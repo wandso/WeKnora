@@ -5877,7 +5877,17 @@ export default {
       eyeModeShort: 'アイケア',
       dayModeTip: '昼間モード：明るくクリア',
       nightModeTip: '夜間モード：暗くまぶしくない',
-      eyeModeTip: 'アイケアモード：暖色の紙面でブルーライトを抑えます'
+      eyeModeTip: 'アイケアモード：暖色の紙面でブルーライトを抑えます',
+      customColorShort: 'カラー',
+      customColorTip: 'カスタム色：昼間・夜間・アイケアすべてのモードに適用されます',
+      customColorTitle: 'カスタムテーマカラー',
+      customColorDescription: 'インターフェースのアクセントカラーを選択します。明るい／暗い色階を自動生成し、すべての表示モードに適用されます。',
+      customColorPreview: 'プレビュー',
+      customColorPick: '色を選択',
+      customColorPresets: 'おすすめの色',
+      customColorLowContrast: 'この色は明るすぎるか暗すぎるため、文字が読みにくい場合があります。',
+      customColorReset: '既定の色に戻す',
+      customColorHint: 'このアカウントの端末にのみ保存されます'
     },
     font: {
       uiFont: 'インターフェースフォント',

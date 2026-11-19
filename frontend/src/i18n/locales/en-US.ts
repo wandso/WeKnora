@@ -6016,7 +6016,17 @@ export default {
       eyeModeShort: 'Eye care',
       dayModeTip: 'Day mode: bright and crisp',
       nightModeTip: 'Night mode: dark and low-brightness',
-      eyeModeTip: 'Eye care mode: warm paper tone with less blue light'
+      eyeModeTip: 'Eye care mode: warm paper tone with less blue light',
+      customColorShort: 'Color',
+      customColorTip: 'Custom accent: applies to day, night and eye care modes',
+      customColorTitle: 'Custom accent colour',
+      customColorDescription: 'Pick a colour to use as the interface accent. Light and dark ramps are generated from it and apply to every appearance mode.',
+      customColorPreview: 'Preview',
+      customColorPick: 'Pick a colour',
+      customColorPresets: 'Suggested colours',
+      customColorLowContrast: 'This colour is very light or very dark; some text may be hard to read.',
+      customColorReset: 'Reset to default',
+      customColorHint: 'Saved locally for this account only'
     },
     font: {
       uiFont: 'Interface Font',

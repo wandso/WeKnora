@@ -2,8 +2,16 @@ import { ref } from 'vue'
 import {
   loadPreference,
   savePreference,
+  safeRemoveItem,
+  userKey,
   migratePreferencesIntoUser,
 } from './preferenceStorage'
+import {
+  ACCENT_COLOR_KEY,
+  applyAccentPalette,
+  normalizeHex,
+  type AccentAppearance,
+} from './accentColor'
 
 /**
  * light = 白天模式（TDesign light）
@@ -31,8 +39,19 @@ function loadTheme(): ThemeMode {
 const currentTheme = ref<ThemeMode>(loadTheme())
 // What is actually painted right now: 'system' is resolved, 'eye' stays 'eye'.
 const effectiveTheme = ref<EffectiveTheme>('light')
+// null means "use TDesign's built-in green ramp".
+const accentColor = ref<string | null>(loadAccentColor())
 
 let lastEffective: EffectiveTheme | null = null
+
+function loadAccentColor(): string | null {
+  return normalizeHex(loadPreference(ACCENT_COLOR_KEY))
+}
+
+/** Eye care uses the light ramp; only true dark gets the inverted ramp. */
+function accentAppearance(effective: EffectiveTheme): AccentAppearance {
+  return effective === 'dark' ? 'dark' : 'light'
+}
 
 function getSystemTheme(): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
@@ -90,16 +109,20 @@ function syncWailsNativeChrome(effective: EffectiveTheme) {
 function applyTheme(mode: ThemeMode) {
   const effective = resolveTheme(mode)
   effectiveTheme.value = effective
-  if (lastEffective === effective) return
-  lastEffective = effective
-  const root = document.documentElement
-  root.setAttribute('theme-mode', effective === 'dark' ? 'dark' : 'light')
-  if (effective === 'eye') {
-    root.setAttribute('data-vision', 'eye')
-  } else {
-    root.removeAttribute('data-vision')
+  if (lastEffective !== effective) {
+    lastEffective = effective
+    const root = document.documentElement
+    root.setAttribute('theme-mode', effective === 'dark' ? 'dark' : 'light')
+    if (effective === 'eye') {
+      root.setAttribute('data-vision', 'eye')
+    } else {
+      root.removeAttribute('data-vision')
+    }
+    syncWailsNativeChrome(effective)
   }
-  syncWailsNativeChrome(effective)
+  // Rebuild the ramp on every apply: switching between light/dark/eye has to
+  // flip the step order even when the chosen colour itself did not change.
+  applyAccentPalette(accentColor.value, accentAppearance(effective))
 }
 
 export function useTheme() {
@@ -111,12 +134,27 @@ export function useTheme() {
     return true
   }
 
-  return { currentTheme, effectiveTheme, setTheme }
+  /** null clears the override and restores TDesign's default ramp. */
+  function setAccentColor(value: string | null): boolean {
+    const hex = value === null ? null : normalizeHex(value)
+    if (value !== null && !hex) return false
+    accentColor.value = hex
+    if (hex) {
+      savePreference(ACCENT_COLOR_KEY, hex)
+    } else {
+      safeRemoveItem(userKey(ACCENT_COLOR_KEY))
+    }
+    applyAccentPalette(hex, accentAppearance(effectiveTheme.value))
+    return true
+  }
+
+  return { currentTheme, effectiveTheme, accentColor, setTheme, setAccentColor }
 }
 
 /** Call once in main.ts to initialise theme and listen for OS changes. */
 export function initTheme() {
   currentTheme.value = loadTheme()
+  accentColor.value = loadAccentColor()
   applyTheme(currentTheme.value)
 
   // React to OS theme changes when user chose "system"
@@ -131,5 +169,6 @@ export function initTheme() {
 export function reloadThemeFromStorage() {
   migratePreferencesIntoUser()
   currentTheme.value = loadTheme()
+  accentColor.value = loadAccentColor()
   applyTheme(currentTheme.value)
 }
