@@ -12,6 +12,17 @@ import {
   normalizeHex,
   type AccentAppearance,
 } from './accentColor'
+import {
+  BACKDROP_THEME_KEY,
+  applyBackdrop,
+  backdropWindowColor,
+  buildBackdropTokens,
+  isBuiltinBackdropId,
+  isSafeDataImage,
+  parseBackdropState,
+  type BackdropId,
+  type BackdropState,
+} from './backdropTheme'
 
 /**
  * light = 白天模式（TDesign light）
@@ -41,11 +52,22 @@ const currentTheme = ref<ThemeMode>(loadTheme())
 const effectiveTheme = ref<EffectiveTheme>('light')
 // null means "use TDesign's built-in green ramp".
 const accentColor = ref<string | null>(loadAccentColor())
+const backdrop = ref<BackdropState>(loadBackdrop())
 
-let lastEffective: EffectiveTheme | null = null
+let lastPaintKey: string | null = null
 
 function loadAccentColor(): string | null {
   return normalizeHex(loadPreference(ACCENT_COLOR_KEY))
+}
+
+function loadBackdrop(): BackdropState {
+  const raw = loadPreference(BACKDROP_THEME_KEY)
+  if (!raw) return { id: 'none' }
+  try {
+    return parseBackdropState(JSON.parse(raw))
+  } catch {
+    return { id: 'none' }
+  }
 }
 
 /** Eye care uses the light ramp; only true dark gets the inverted ramp. */
@@ -62,21 +84,31 @@ function resolveTheme(mode: ThemeMode): EffectiveTheme {
   return mode
 }
 
-/** Wails：与原生窗口底色 / 系统深浅色一致，减轻 Ctrl+R 整窗白闪（浅色与 --td-bg-color-page 对齐） */
-function syncWailsNativeChrome(effective: EffectiveTheme) {
-  const bg = effective === 'dark' ? '#181818' : effective === 'eye' ? '#eae4d0' : '#eeeeee'
-  document.documentElement.style.background = bg
+/**
+ * Wails / 首屏兜底底色。背景主题激活时 #app 自身有渐变铺底，这里只保留
+ * html/body 的实色作为边缘兜底，不再给 #app 写死纯色把渐变盖掉。
+ */
+function syncWailsNativeChrome(effective: EffectiveTheme, pageBackground: string | null) {
+  const fallback = effective === 'dark' ? '#181818' : effective === 'eye' ? '#eae4d0' : '#eeeeee'
+  document.documentElement.style.background = pageBackground ?? fallback
   document.documentElement.style.minHeight = '100%'
   document.documentElement.style.colorScheme = effective === 'dark' ? 'dark' : 'light'
   if (document.body) {
-    document.body.style.background = bg
+    document.body.style.background = pageBackground ?? fallback
     document.body.style.minHeight = '100%'
   }
+  // #app 的 background 由 App.vue 的 var(--td-bg-color-page) 负责；清掉旧内联值
+  // 让背景主题的渐变/图片能显示出来，无背景主题时再写回实色作为兜底。
   const appEl = document.getElementById('app')
   if (appEl) {
-    appEl.style.background = bg
+    if (pageBackground) {
+      appEl.style.removeProperty('background')
+    } else {
+      appEl.style.background = fallback
+    }
     appEl.style.minHeight = '100%'
   }
+
   const w = (window as unknown as {
     runtime?: {
       WindowSetDarkTheme?: () => void
@@ -86,16 +118,17 @@ function syncWailsNativeChrome(effective: EffectiveTheme) {
   }).runtime
   if (!w?.WindowSetBackgroundColour) return
   try {
-    if (effective === 'dark') {
-      w.WindowSetDarkTheme?.()
-      w.WindowSetBackgroundColour(24, 24, 24, 255)
-    } else if (effective === 'eye') {
-      w.WindowSetLightTheme?.()
-      w.WindowSetBackgroundColour(234, 228, 208, 255)
-    } else {
-      w.WindowSetLightTheme?.()
-      w.WindowSetBackgroundColour(238, 238, 238, 255)
-    }
+    if (effective === 'dark') w.WindowSetDarkTheme?.()
+    else w.WindowSetLightTheme?.()
+    const rgb = backdropWindowColor(backdrop.value, effective)
+    const [r, g, b] = rgb
+      ? [1, 3, 5].map((i) => parseInt(rgb.slice(i, i + 2), 16))
+      : effective === 'dark'
+        ? [24, 24, 24]
+        : effective === 'eye'
+          ? [234, 228, 208]
+          : [238, 238, 238]
+    w.WindowSetBackgroundColour(r, g, b, 255)
   } catch {
     /* 非桌面壳或未注入 runtime */
   }
@@ -109,20 +142,22 @@ function syncWailsNativeChrome(effective: EffectiveTheme) {
 function applyTheme(mode: ThemeMode) {
   const effective = resolveTheme(mode)
   effectiveTheme.value = effective
-  if (lastEffective !== effective) {
-    lastEffective = effective
-    const root = document.documentElement
-    root.setAttribute('theme-mode', effective === 'dark' ? 'dark' : 'light')
-    if (effective === 'eye') {
-      root.setAttribute('data-vision', 'eye')
-    } else {
-      root.removeAttribute('data-vision')
-    }
-    syncWailsNativeChrome(effective)
-  }
-  // Rebuild the ramp on every apply: switching between light/dark/eye has to
-  // flip the step order even when the chosen colour itself did not change.
+  const root = document.documentElement
+  root.setAttribute('theme-mode', effective === 'dark' ? 'dark' : 'light')
+  if (effective === 'eye') root.setAttribute('data-vision', 'eye')
+  else root.removeAttribute('data-vision')
+
+  // Rebuild on every apply: light/dark/eye flip the ramp order and the
+  // backdrop token set, even when the chosen values did not change.
   applyAccentPalette(accentColor.value, accentAppearance(effective))
+  applyBackdrop(backdrop.value, effective)
+
+  const paintKey = [effective, backdrop.value.id, backdrop.value.image ?? ''].join('|')
+  if (lastPaintKey !== paintKey) {
+    lastPaintKey = paintKey
+    const pageTokens = buildBackdropTokens(backdrop.value, effective)
+    syncWailsNativeChrome(effective, pageTokens['--td-bg-color-page'] ?? null)
+  }
 }
 
 export function useTheme() {
@@ -148,13 +183,38 @@ export function useTheme() {
     return true
   }
 
-  return { currentTheme, effectiveTheme, accentColor, setTheme, setAccentColor }
+  /**
+   * Switch the background theme. 'custom' requires a validated image data URL;
+   * every other id is a built-in preset (use 'none' to clear).
+   */
+  function setBackdrop(id: BackdropId, image?: string): boolean {
+    let next: BackdropState
+    if (id === 'custom') {
+      if (!image || !isSafeDataImage(image)) return false
+      next = { id: 'custom', image }
+    } else if (isBuiltinBackdropId(id)) {
+      next = { id }
+    } else {
+      return false
+    }
+    backdrop.value = next
+    if (next.id === 'none') {
+      safeRemoveItem(userKey(BACKDROP_THEME_KEY))
+    } else {
+      savePreference(BACKDROP_THEME_KEY, JSON.stringify(next))
+    }
+    applyTheme(currentTheme.value)
+    return true
+  }
+
+  return { currentTheme, effectiveTheme, accentColor, backdrop, setTheme, setAccentColor, setBackdrop }
 }
 
 /** Call once in main.ts to initialise theme and listen for OS changes. */
 export function initTheme() {
   currentTheme.value = loadTheme()
   accentColor.value = loadAccentColor()
+  backdrop.value = loadBackdrop()
   applyTheme(currentTheme.value)
 
   // React to OS theme changes when user chose "system"
@@ -170,5 +230,6 @@ export function reloadThemeFromStorage() {
   migratePreferencesIntoUser()
   currentTheme.value = loadTheme()
   accentColor.value = loadAccentColor()
+  backdrop.value = loadBackdrop()
   applyTheme(currentTheme.value)
 }

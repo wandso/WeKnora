@@ -368,3 +368,16 @@ select:-webkit-autofill {
 :root:root[data-vision="eye"] *::-webkit-scrollbar-track {
     background-color: transparent;
 }
+
+/* ============================================================
+ * 背景主题（html[data-backdrop]）
+ * 令牌由 composables/backdropTheme.ts 写到 <html> 内联变量；这里只负责
+ * 自定义图片的铺放方式。预设用的是径向渐变，默认 background-size 即可铺满。
+ * ============================================================ */
+html[data-backdrop="custom"],
+html[data-backdrop="custom"] #app {
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    background-attachment: fixed;
+}

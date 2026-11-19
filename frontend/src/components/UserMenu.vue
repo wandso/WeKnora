@@ -98,7 +98,27 @@
             <t-icon name="palette" class="menu-icon" />
             <span>{{ $t('theme.appearance') }}</span>
           </div>
-          <ThemeModeSwitch @pick-accent="accentDialogVisible = true" />
+          <ThemeModeSwitch />
+          <!-- 内容色与背景是两个独立维度：前者只改按钮/链接/选中态，后者换整套氛围。 -->
+          <button type="button" class="appearance-entry" @click="accentDialogVisible = true">
+            <span
+              class="appearance-entry__swatch"
+              :style="{ background: accentColor ?? DEFAULT_ACCENT_COLOR }"
+            />
+            <span class="appearance-entry__body">
+              <span class="appearance-entry__name">{{ $t('theme.contentColor') }}</span>
+              <span class="appearance-entry__hint">{{ $t('theme.contentColorHint') }}</span>
+            </span>
+            <t-icon name="chevron-right" size="14px" class="appearance-entry__arrow" />
+          </button>
+          <button type="button" class="appearance-entry" @click="backgroundDialogVisible = true">
+            <span class="appearance-entry__icon"><t-icon name="image" size="15px" /></span>
+            <span class="appearance-entry__body">
+              <span class="appearance-entry__name">{{ $t('theme.backgroundTheme') }}</span>
+              <span class="appearance-entry__hint">{{ activeBackdropLabel }}</span>
+            </span>
+            <t-icon name="chevron-right" size="14px" class="appearance-entry__arrow" />
+          </button>
         </div>
         <div class="menu-divider"></div>
         <!-- 账号与空间是头像菜单的核心上下文；基础设施类配置统一收进「全部设置」。 -->
@@ -221,8 +241,9 @@
 
     <!-- 创建工作区弹窗 -->
     <CreateTenantDialog v-model:visible="createTenantDialogVisible" @created="onTenantCreated" />
-    <!-- 取色弹窗放在下拉之外：菜单关闭时它仍需存活 -->
+    <!-- 两个弹窗都放在下拉之外：菜单关闭时它们仍需存活 -->
     <AccentColorDialog v-model:visible="accentDialogVisible" />
+    <BackgroundThemeDialog v-model:visible="backgroundDialogVisible" />
   </div>
 </template>
 
@@ -238,6 +259,10 @@ import CreateTenantDialog from '@/components/CreateTenantDialog.vue'
 import GlobalInvitationBell from '@/components/GlobalInvitationBell.vue'
 import ThemeModeSwitch from '@/components/ThemeModeSwitch.vue'
 import AccentColorDialog from '@/components/AccentColorDialog.vue'
+import BackgroundThemeDialog from '@/components/BackgroundThemeDialog.vue'
+import { useTheme } from '@/composables/useTheme'
+import { DEFAULT_ACCENT_COLOR } from '@/composables/accentColor'
+import { BACKDROP_PRESETS } from '@/composables/backdropTheme'
 import {
   navigateAfterTenantSwitch,
   persistLastActiveTenantPreference,
@@ -270,6 +295,14 @@ const activeTenantName = computed(() => {
 const currentRoleLabel = computed(() => formatRole(authStore.currentTenantRole))
 const currentRoleIcon = computed(() => roleIcon(authStore.currentTenantRole))
 
+const { accentColor, backdrop } = useTheme()
+const activeBackdropLabel = computed(() => {
+  if (backdrop.value.id === 'custom') return t('theme.backdropCustomActive')
+  if (backdrop.value.id === 'none') return t('theme.backdropNone')
+  const preset = BACKDROP_PRESETS.find((item) => item.id === backdrop.value.id)
+  return preset ? t(preset.labelKey) : t('theme.backdropNone')
+})
+
 // 单空间用户（memberships <= 1 且非 superuser）= 永远 home + owner，第三
 // 行就是 user-email 信息的重复，没必要占视觉空间；只对多空间 / superuser
 // 渲染。Lite 模式下没有 RBAC 概念，统一隐藏。
@@ -293,6 +326,7 @@ const menuRef = ref<HTMLElement>()
 const tenantMenuItemRef = ref<HTMLElement>()
 const menuVisible = ref(false)
 const accentDialogVisible = ref(false)
+const backgroundDialogVisible = ref(false)
 const tenantSubmenuOpen = ref(false)
 const tenantSubmenuStyle = ref<Record<string, string>>({})
 let tenantSubmenuHideTimer: ReturnType<typeof setTimeout> | null = null
@@ -1004,6 +1038,68 @@ onUnmounted(() => {
       font-size: var(--app-text-xl);
       color: var(--td-text-color-secondary);
     }
+  }
+
+  .appearance-entry {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    margin-top: 4px;
+    padding: 7px 8px;
+    border: 0;
+    border-radius: var(--app-radius-sm);
+    background: transparent;
+    color: var(--td-text-color-primary);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--app-motion-fast) ease;
+
+    &:hover {
+      background: var(--td-bg-color-container-hover);
+    }
+  }
+
+  .appearance-entry__swatch,
+  .appearance-entry__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    color: var(--td-text-color-secondary);
+  }
+
+  .appearance-entry__swatch {
+    border: 1px solid var(--td-component-stroke);
+    border-radius: var(--app-radius-pill);
+  }
+
+  .appearance-entry__body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+
+  .appearance-entry__name {
+    font-size: var(--app-text-sm);
+  }
+
+  .appearance-entry__hint {
+    overflow: hidden;
+    color: var(--td-text-color-placeholder);
+    font-size: var(--app-text-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .appearance-entry__arrow {
+    flex-shrink: 0;
+    color: var(--td-text-color-placeholder);
   }
 }
 

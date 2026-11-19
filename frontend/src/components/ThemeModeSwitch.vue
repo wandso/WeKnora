@@ -18,19 +18,6 @@
       <t-icon :name="option.icon" size="16px" class="theme-mode-switch__icon" />
       <span v-if="showLabel" class="theme-mode-switch__label">{{ t(option.labelKey) }}</span>
     </button>
-    <button
-      type="button"
-      class="theme-mode-switch__option theme-mode-switch__option--accent"
-      :title="t('theme.customColorTip')"
-      :aria-label="t('theme.customColorShort')"
-      @click="emit('pick-accent')"
-    >
-      <span
-        class="theme-mode-switch__swatch"
-        :style="{ background: accentColor ?? DEFAULT_ACCENT_COLOR }"
-      />
-      <span v-if="showLabel" class="theme-mode-switch__label">{{ t('theme.customColorShort') }}</span>
-    </button>
   </div>
 </template>
 
@@ -38,9 +25,6 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
-import { DEFAULT_ACCENT_COLOR } from '@/composables/accentColor'
-
-const emit = defineEmits<{ 'pick-accent': [] }>()
 
 /**
  * 白天 / 夜间 / 护眼 三态切换。
@@ -58,7 +42,7 @@ withDefaults(defineProps<{
 })
 
 const { t } = useI18n()
-const { currentTheme, effectiveTheme, accentColor, setTheme } = useTheme()
+const { currentTheme, effectiveTheme, setTheme } = useTheme()
 
 const options: Array<{ value: Exclude<ThemeMode, 'system'>; icon: string; labelKey: string; tipKey: string }> = [
   { value: 'light', icon: 'sunny', labelKey: 'theme.dayMode', tipKey: 'theme.dayModeTip' },
@@ -136,20 +120,6 @@ const select = (mode: Exclude<ThemeMode, 'system'>) => {
 
 .theme-mode-switch__icon {
   flex-shrink: 0;
-}
-
-.theme-mode-switch__swatch {
-  width: 12px;
-  height: 12px;
-  flex-shrink: 0;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: var(--app-radius-pill);
-}
-
-// The picker is an action, not a current mode: never paint it as active.
-.theme-mode-switch__option--accent {
-  border-left: 1px solid var(--td-component-stroke);
-  border-radius: 0 var(--app-radius-sm) var(--app-radius-sm) 0;
 }
 
 .theme-mode-switch__label {
