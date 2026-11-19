@@ -9,16 +9,33 @@ server:
 conversation:
   max_rounds: 5
   keyword_threshold: 0.3
-  embedding_top_k: 30
-  vector_threshold: 0.2
+  embedding_top_k: 50          # was 30: align with code default (DefaultRetrievalTopK); wider recall before the gate
+  vector_threshold: 0.15       # was 0.2: align with code default, widen vector recall
   rerank_threshold: 0.3
-  rerank_top_k: 30
-  fallback_strategy: "model"
-  fallback_response: "Sorry, I am unable to answer this question."
-  fallback_prompt_id: "default_fallback_prompt"  # from prompt_templates/fallback.yaml (mode: "model")
+  rerank_top_k: 20             # was 30: cut rerank cost; 20 chunks is enough context
+  # [Productization 2026-11-18] Strict no-fabrication fallback.
+  # "fixed" returns the literal text below with NO LLM call -> model can never invent facts.
+  # "model" would call the LLM with fallback_prompt_id, which (by design) uses general
+  # knowledge and can fabricate. Keep it "fixed" for enterprise/compliance deployments.
+  fallback_strategy: "fixed"
+  fallback_response: |-
+    抱歉，我在当前知识库中没有找到可以可靠回答这个问题的资料，因此不会凭猜测作答。
+    建议您：
+    1. 换一种表述或补充更多背景信息后重试；
+    2. 如需进一步协助，请联系相关业务的负责人或人工客服。
+  fallback_prompt_id: "default_fallback_prompt"  # only used when fallback_strategy = "model"
   enable_rewrite: true
   enable_query_expansion: true
   enable_rerank: true
+  # PassageGate: cheap LLM judge before rerank; shrinks ~200 candidates to ~10-20.
+  # Fail-open by design: skipped if no model / small pool / judge error.
+  # NOTE: main chat path reads these yaml values; /knowledge-search API path reads
+  # tenant retrieval-config KV instead (set passage_gate_* there for that path).
+  passage_gate_enabled: true
+  passage_gate_model_id: ""          # empty -> falls back to query-understand / chat model
+  passage_gate_min_candidates: 20
+  passage_gate_keep: 10
+  passage_gate_timeout_ms: 3000
   rewrite_prompt_id: "default_rewrite"  # from prompt_templates/rewrite.yaml (content + user fields)
   generate_summary_prompt_id: "default_summary"  # from prompt_templates/generate_summary.yaml
   generate_kb_description_prompt_id: "default_kb_description"  # from prompt_templates/generate_kb_description.yaml
