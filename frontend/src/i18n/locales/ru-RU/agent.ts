@@ -2,9 +2,9 @@ export default {
   automation: {
     conversationNotice: 'Этот диалог выполняется автоматизацией. Отправка сообщений вручную недоступна. Обработайте ожидающие запросы выше.',
     title: 'Автоматизации',
-    description: 'Помощник WeKnora выполняет задачи по расписанию от вашего имени. О результатах и ожидающих подтверждениях вы получите уведомление.',
+    description: 'Помощник 设计院知识库 выполняет задачи по расписанию от вашего имени. О результатах и ожидающих подтверждениях вы получите уведомление.',
     add: 'Новая автоматизация',
-    addHint: 'Или попросите ассистента WeKnora создать её',
+    addHint: 'Или попросите ассистента 设计院知识库 создать её',
     paused: 'Приостановлена',
     scheduleEnded: 'Завершено',
     scheduleEndedHint: 'Время однократного запуска прошло. Запустите сейчас или измените время перед возобновлением.',
@@ -56,7 +56,7 @@ export default {
       sections: {
         basic: {
           title: 'Основное',
-          desc: 'Задачи выполняет помощник WeKnora. Для делегирования укажите в задаче агентов и порученную им работу.'
+          desc: 'Задачи выполняет помощник 设计院知识库. Для делегирования укажите в задаче агентов и порученную им работу.'
         },
         schedule: {
           title: 'Расписание',
@@ -1209,7 +1209,7 @@ export default {
     },
     hostApproval: {
       titleDelete: 'Подтвердите удаление файлов',
-      titleDenied: 'WeKnora хочет получить доступ к следующему каталогу',
+      titleDenied: '设计院知识库 хочет получить доступ к следующему каталогу',
       titleGeneric: 'Нужно ваше подтверждение',
       command: 'Команда',
       cwd: 'Каталог',
@@ -1249,7 +1249,7 @@ export default {
     }
   },
   assistant: {
-    title: 'Ассистент WeKnora',
+    title: 'Ассистент 设计院知识库',
     newConversation: 'Новый диалог',
     history: 'История диалогов',
     untitledConversation: 'Диалог без названия',
@@ -1263,10 +1263,10 @@ export default {
     },
     welcomeTitle: 'Чем помочь?',
     agentWelcomeDesc: 'Проверьте настройки этого агента, смените модель или узнайте, в каких базах знаний он может искать.',
-    welcomeDesc: 'Помогу разобраться в WeKnora, упорядочить знания и документы, настроить агентов, инструменты и автоматизации.',
+    welcomeDesc: 'Помогу разобраться в 设计院知识库, упорядочить знания и документы, настроить агентов, инструменты и автоматизации.',
     help: {
       label: 'О помощнике',
-      title: 'Что умеет помощник WeKnora',
+      title: 'Что умеет помощник 设计院知识库',
       identity: 'Помощник действует от вашего имени. Он видит и меняет только то, что позволяет ваша роль в этом пространстве.',
       page: 'Открываясь, он берёт текущую страницу: может разобрать её содержимое, настроить агентов и автоматизации или заполнить формы. Кнопки он не нажимает и сам не сохраняет.',
       access: 'Под полем ввода можно сменить доступ: только чтение, подтверждение перед изменениями или автоматическое выполнение обратимых правок. Удаление всегда требует подтверждения, а потолок, заданный администратором, превысить нельзя.'
@@ -1356,8 +1356,8 @@ export default {
         q3: 'What should I check if Ollama will not connect?'
       },
       weknoracloud: {
-        description: 'I can explain which models WeKnora Cloud offers, and how to bind and choose them.',
-        q1: 'Which models does WeKnora Cloud provide?',
+        description: 'I can explain which models 设计院知识库 Cloud offers, and how to bind and choose them.',
+        q1: 'Which models does 设计院知识库 Cloud provide?',
         q2: 'How do I enable or bind a Cloud account?',
         q3: 'When should I use Cloud models versus ones I connect myself?'
       },
@@ -1482,14 +1482,14 @@ export default {
         q3: 'Is there a ready-made request example?'
       },
       'integration-mcpserver': {
-        description: 'I can explain how to expose WeKnora as an MCP server, and which tools it offers.',
-        q1: 'How do I offer WeKnora as an MCP server?',
+        description: 'I can explain how to expose 设计院知识库 as an MCP server, and which tools it offers.',
+        q1: 'How do I offer 设计院知识库 as an MCP server?',
         q2: 'How does an external client connect?',
         q3: 'Which tools does this server expose?'
       },
       'integration-cli': {
         description: 'I can walk you through installing and signing in to the CLI, and the common commands.',
-        q1: 'How do I install and sign in to the WeKnora CLI?',
+        q1: 'How do I install and sign in to the 设计院知识库 CLI?',
         q2: 'What knowledge-base and chat operations can the CLI do?',
         q3: 'What are the most useful commands?'
       },
@@ -1500,8 +1500,8 @@ export default {
         q3: 'Where does text I select in the extension get sent?'
       },
       'integration-claw': {
-        description: 'I can explain how to connect WeKnora to Claw, and which skill to install.',
-        q1: 'How do I connect WeKnora to Claw?',
+        description: 'I can explain how to connect 设计院知识库 to Claw, and which skill to install.',
+        q1: 'How do I connect 设计院知识库 to Claw?',
         q2: 'Which skill do I need to install?',
         q3: 'What can I do in Claw after it is connected?'
       }
@@ -1655,7 +1655,7 @@ export default {
       documentSummary: 'Каковы ключевые выводы этого документа?',
       failedDocuments: 'Какие документы этой базы знаний не удалось разобрать?',
       recentActivity: 'Какие документы недавно загрузили или обновили?',
-      formats: 'Какие форматы документов поддерживает WeKnora?',
+      formats: 'Какие форматы документов поддерживает 设计院知识库?',
       createWiki: 'Как создать базу знаний Wiki?',
       agents: 'Для каких вопросов подходит каждый из этих агентов?',
       messageSources: 'На чём основан этот ответ?',
@@ -1667,7 +1667,7 @@ export default {
       modelSetup: 'Какие модели мне ещё нужно настроить?',
       mcpSetup: 'Как подключить MCP-сервис?',
       releaseHighlights: 'Что изменилось в текущей версии?',
-      gettingStarted: 'Что нужно настроить в WeKnora в первую очередь?',
+      gettingStarted: 'Что нужно настроить в 设计院知识库 в первую очередь?',
       workflow: 'Как использовать вместе базы знаний, агентов и автоматизации?',
       knowledgeOverview: 'Какую информацию можно найти в каждой из этих баз знаний?',
       knowledgeType: 'Когда лучше использовать документы, FAQ или Wiki?',

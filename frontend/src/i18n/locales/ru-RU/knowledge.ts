@@ -52,8 +52,8 @@ export default {
           desc: 'Конвертер Microsoft MarkItDown (PDF/Office/HTML и др.)'
         },
         weknoracloud: {
-          name: 'WeKnora Cloud',
-          desc: 'Парсинг документов через WeKnora Cloud'
+          name: '设计院知识库 Cloud',
+          desc: 'Парсинг документов через 设计院知识库 Cloud'
         },
         paddleocr_vl_cloud: {
           name: 'PaddleOCR-VL Cloud',
@@ -884,7 +884,7 @@ export default {
       systemActor: 'Система',
       actorWithAPIKey: '{actor} · API Key · {name}',
       actorAPIKey: 'API Key · {name}',
-      viaAssistant: 'Через ассистента WeKnora',
+      viaAssistant: 'Через ассистента 设计院知识库',
       knowledgeBase: 'База знаний',
       countItems: '{count} элем.',
       titleWithCount: '{title} и ещё {count}',

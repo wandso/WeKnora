@@ -338,7 +338,7 @@ export default {
     }
   },
   createChat: {
-    title: 'Hi, I am WeKnora — your knowledge, within reach',
+    title: 'Hi, I am 设计院知识库 — your knowledge, within reach',
     newSessionTitle: 'New Session',
     openProject: 'Select project',
     clearProject: 'Clear',

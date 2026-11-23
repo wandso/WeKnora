@@ -360,7 +360,7 @@ export default {
     attachmentStillProcessing: '첨부 파일 {name}을(를) 아직 분석 중입니다'
   },
   createChat: {
-    title: '안녕하세요, WeKnora입니다 — 당신의 지식을 손끝에',
+    title: '안녕하세요, 设计院知识库입니다 — 당신의 지식을 손끝에',
     newSessionTitle: '새 세션',
     openProject: '프로젝트 선택',
     clearProject: '바인딩 해제',

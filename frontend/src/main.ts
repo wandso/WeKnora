@@ -32,7 +32,7 @@ async function bootstrap() {
 
   // 全局错误处理：捕获未处理的组件错误，防止白屏
   app.config.errorHandler = (err, instance, info) => {
-    console.error("[WeKnora] Unhandled Vue error:", err, "\nComponent:", instance, "\nInfo:", info);
+    console.error("[设计院知识库] Unhandled Vue error:", err, "\nComponent:", instance, "\nInfo:", info);
   };
 
   app.use(TDesign);
@@ -42,7 +42,7 @@ async function bootstrap() {
   try {
     await initI18n();
   } catch (err) {
-    console.error("[WeKnora] Failed to load initial locale bundle:", err);
+    console.error("[设计院知识库] Failed to load initial locale bundle:", err);
   }
 
   // Capabilities (can_create_tenant, auto_accept_invitation) are not cached

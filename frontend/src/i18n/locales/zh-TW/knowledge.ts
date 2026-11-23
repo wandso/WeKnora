@@ -52,8 +52,8 @@ export default {
           desc: 'Microsoft MarkItDown 文件轉換工具（支援 PDF/Office/HTML 等）'
         },
         weknoracloud: {
-          name: 'WeKnora Cloud',
-          desc: '使用 WeKnora Cloud 進行文件解析'
+          name: '设计院知识库 Cloud',
+          desc: '使用 设计院知识库 Cloud 進行文件解析'
         },
         paddleocr_vl_cloud: {
           name: 'PaddleOCR-VL Cloud',
@@ -884,7 +884,7 @@ export default {
       systemActor: '系統觸發',
       actorWithAPIKey: '{actor} · API Key · {name}',
       actorAPIKey: 'API Key · {name}',
-      viaAssistant: '經 WeKnora 助手',
+      viaAssistant: '經 设计院知识库 助手',
       knowledgeBase: '知識庫',
       countItems: '共 {count} 項',
       titleWithCount: '{title} 等 {count} 項',

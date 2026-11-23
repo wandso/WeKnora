@@ -2,9 +2,9 @@ export default {
   automation: {
     conversationNotice: 'This conversation is run by an automation. Manual messages are unavailable; handle pending requests above.',
     title: 'Automations',
-    description: 'Have the WeKnora assistant run tasks on a schedule as you. You are notified of results and pending approvals.',
+    description: 'Have the 设计院知识库 assistant run tasks on a schedule as you. You are notified of results and pending approvals.',
     add: 'New automation',
-    addHint: 'Or ask the WeKnora assistant to set one up',
+    addHint: 'Or ask the 设计院知识库 assistant to set one up',
     paused: 'Paused',
     scheduleEnded: 'Ended',
     scheduleEndedHint: 'This one-time schedule has ended. Run it now, or edit the run time before resuming.',
@@ -56,7 +56,7 @@ export default {
       sections: {
         basic: {
           title: 'Basics',
-          desc: 'The WeKnora assistant runs each task. To delegate work, name the agents and their assignments in the task.'
+          desc: 'The 设计院知识库 assistant runs each task. To delegate work, name the agents and their assignments in the task.'
         },
         schedule: {
           title: 'Schedule',
@@ -655,7 +655,7 @@ export default {
     }
   },
   assistant: {
-    title: 'WeKnora Assistant',
+    title: '设计院知识库 Assistant',
     newConversation: 'New conversation',
     history: 'Conversation history',
     untitledConversation: 'Untitled conversation',
@@ -669,10 +669,10 @@ export default {
     },
     welcomeTitle: 'How can I help?',
     agentWelcomeDesc: 'Check this agent’s configuration, change its model or see which knowledge bases it can search.',
-    welcomeDesc: 'I can answer questions about WeKnora, organize knowledge and documents, and help set up agents, tools and automations.',
+    welcomeDesc: 'I can answer questions about 设计院知识库, organize knowledge and documents, and help set up agents, tools and automations.',
     help: {
       label: 'About the assistant',
-      title: 'What the WeKnora assistant can do',
+      title: 'What the 设计院知识库 assistant can do',
       identity: 'The assistant works as you. It can see and change only what your role in this workspace allows.',
       page: 'It keeps the current page attached, so it can summarize what is on screen, set up agents and automations, or fill in forms. It will not click buttons or save for you.',
       access: 'Under the input you can switch access: read-only, confirm before changes, or run recoverable changes automatically. Deletes always need your confirmation, and an admin ceiling cannot be exceeded.'
@@ -762,8 +762,8 @@ export default {
         q3: 'What should I check if Ollama will not connect?'
       },
       weknoracloud: {
-        description: 'I can explain which models WeKnora Cloud offers, and how to bind and choose them.',
-        q1: 'Which models does WeKnora Cloud provide?',
+        description: 'I can explain which models 设计院知识库 Cloud offers, and how to bind and choose them.',
+        q1: 'Which models does 设计院知识库 Cloud provide?',
         q2: 'How do I enable or bind a Cloud account?',
         q3: 'When should I use Cloud models versus ones I connect myself?'
       },
@@ -888,14 +888,14 @@ export default {
         q3: 'Is there a ready-made request example?'
       },
       'integration-mcpserver': {
-        description: 'I can explain how to expose WeKnora as an MCP server, and which tools it offers.',
-        q1: 'How do I offer WeKnora as an MCP server?',
+        description: 'I can explain how to expose 设计院知识库 as an MCP server, and which tools it offers.',
+        q1: 'How do I offer 设计院知识库 as an MCP server?',
         q2: 'How does an external client connect?',
         q3: 'Which tools does this server expose?'
       },
       'integration-cli': {
         description: 'I can walk you through installing and signing in to the CLI, and the common commands.',
-        q1: 'How do I install and sign in to the WeKnora CLI?',
+        q1: 'How do I install and sign in to the 设计院知识库 CLI?',
         q2: 'What knowledge-base and chat operations can the CLI do?',
         q3: 'What are the most useful commands?'
       },
@@ -906,8 +906,8 @@ export default {
         q3: 'Where does text I select in the extension get sent?'
       },
       'integration-claw': {
-        description: 'I can explain how to connect WeKnora to Claw, and which skill to install.',
-        q1: 'How do I connect WeKnora to Claw?',
+        description: 'I can explain how to connect 设计院知识库 to Claw, and which skill to install.',
+        q1: 'How do I connect 设计院知识库 to Claw?',
         q2: 'Which skill do I need to install?',
         q3: 'What can I do in Claw after it is connected?'
       }
@@ -1061,7 +1061,7 @@ export default {
       documentSummary: 'What are this document’s key conclusions?',
       failedDocuments: 'Which documents in this knowledge base failed to parse?',
       recentActivity: 'Which documents were uploaded or updated recently?',
-      formats: 'Which document formats does WeKnora support?',
+      formats: 'Which document formats does 设计院知识库 support?',
       createWiki: 'How do I create a Wiki knowledge base?',
       agents: 'What kinds of questions is each of these agents good at?',
       messageSources: 'What is this answer based on?',
@@ -1073,7 +1073,7 @@ export default {
       modelSetup: 'Which models do I still need to set up?',
       mcpSetup: 'How do I connect an MCP service?',
       releaseHighlights: 'What are the main changes in the current version?',
-      gettingStarted: 'What should I set up first in WeKnora?',
+      gettingStarted: 'What should I set up first in 设计院知识库?',
       workflow: 'How do knowledge bases, agents and automations work together?',
       knowledgeOverview: 'What can I find in each of these knowledge bases?',
       knowledgeType: 'When should I use documents, FAQ or Wiki?',
@@ -1288,7 +1288,7 @@ export default {
     },
     hostApproval: {
       titleDelete: 'Confirm before deleting files',
-      titleDenied: 'WeKnora wants to access the following directory',
+      titleDenied: '设计院知识库 wants to access the following directory',
       titleGeneric: 'Needs your confirmation',
       command: 'Command',
       cwd: 'Directory',

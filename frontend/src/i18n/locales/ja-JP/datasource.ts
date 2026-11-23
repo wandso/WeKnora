@@ -42,7 +42,7 @@ export default {
     welcomeMessageDesc: '訪問者が最初のメッセージを送る前に埋め込みチャットに表示されます。空欄にすると非表示になります',
     showSuggestedQuestions: '質問候補',
     showSuggestedQuestionsDesc: '訪問者の最初のメッセージの前に、エージェント設定と連携ナレッジベースをもとにした質問候補を表示します',
-    originsHint: 'WeKnora の URL（B）ではなく、埋め込みを許可するホストサイト（A）を入力します。1 行に 1 つの Origin（例: https://shop.example.com）。1 件以上必須。*.example.com に対応。',
+    originsHint: '设计院知识库 の URL（B）ではなく、埋め込みを許可するホストサイト（A）を入力します。1 行に 1 つの Origin（例: https://shop.example.com）。1 件以上必須。*.example.com に対応。',
     originsRequired: '許可オリジンを1件以上入力してください',
     originsInvalid: '無効なオリジン: {origin}',
     originsWildcardProd: '本番環境ではワイルドカードのオリジン「*」は使用できません',
@@ -101,7 +101,7 @@ export default {
     allowFileUploadDesc: '有効にすると、訪問者は画像やドキュメントの添付をアップロードできます。紐付けたエージェントが画像アップロードに対応している必要があります。',
     webhookUrl: 'Webhook URL',
     webhookUrlPlaceholder: 'https://your-server.example.com/weknora/embed-events',
-    webhookUrlDesc: '任意。WeKnoraがmessage_sent / message_receivedイベントをこのHTTPSエンドポイントにPOSTします。',
+    webhookUrlDesc: '任意。设计院知识库がmessage_sent / message_receivedイベントをこのHTTPSエンドポイントにPOSTします。',
     webhookSecret: 'Webhookシークレット',
     webhookSecretPlaceholder: 'HMAC-SHA256シークレット（X-WeKnora-Signatureヘッダー）',
     webhookSecretKeep: '空欄のままにすると保存済みのシークレットを維持します',
@@ -672,7 +672,7 @@ export default {
   },
   integrations: {
     cli: {
-      title: 'WeKnora CLI',
+      title: '设计院知识库 CLI',
       subtitle: 'ターミナルからナレッジベースとドキュメントの管理、コンテンツの検索、質問ができます。CLIやMCPを通じてスクリプトやAIツールと連携できます。',
       docs: 'CLIドキュメント',
       docsHint: 'インストール手順と完全なコマンドリファレンス',
@@ -853,7 +853,7 @@ export default {
       capabilityMessageHistory: 'メッセージ履歴',
       capabilityMessageHistoryHint: 'ワークスペースのチャット履歴の検索と、チャット履歴の統計の読み取りができます。ワークスペース設定へのアクセス権は付与されません。',
       capabilityManageModels: 'モデルの管理',
-      capabilityManageModelsHint: 'モデル定義、認証情報、接続確認、WeKnoraCloudの認証情報を管理します。',
+      capabilityManageModelsHint: 'モデル定義、認証情報、接続確認、设计院知识库Cloudの認証情報を管理します。',
       capabilityManageMcpServices: 'MCPサービスの管理',
       capabilityManageMcpServicesHint: 'このプリンシパルのMCPサービス、認証情報、ツール承認ポリシー、OAuth状態を管理します。',
       capabilityManageDatasources: 'データソースの管理',
@@ -900,14 +900,14 @@ export default {
       directWarning: 'ユーザIDの直接指定は、呼び出し元が渡すヘッダーを信頼します。信頼できるサーバ間通信でのみ使用してください。',
       directWarningDetail: 'APIキーを持つ人であれば誰でもユーザIDヘッダーを書き換えて他の外部ユーザになりすまし、そのユーザのMCP OAuth認可を再利用・乗っ取ることができます。ブラウザや信頼できないクライアントからは使用せず、エンドユーザ向けアプリでは署名付きトークンを使用してください。',
       signedRecommended: 'ユーザ向けアプリに推奨: 自社バックエンドで外部ユーザ用に有効期間の短いHS256 JWTを発行します。',
-      signedFlowDetail: 'HMACシークレットはWeKnoraと信頼できる自社バックエンドにのみ保存し、リクエストに含めたりブラウザに配布したりしないでください。リクエストヘッダーで送るのは、そのシークレットで署名したJWT文字列（発行ごと、または有効期限切れ後に変わります）であり、シークレット自体ではありません。JWTにはsub（外部ユーザID）、tenant_id、aud=weknora、exp（有効期間は最大24時間）を含める必要があります。',
+      signedFlowDetail: 'HMACシークレットは设计院知识库と信頼できる自社バックエンドにのみ保存し、リクエストに含めたりブラウザに配布したりしないでください。リクエストヘッダーで送るのは、そのシークレットで署名したJWT文字列（発行ごと、または有効期限切れ後に変わります）であり、シークレット自体ではありません。JWTにはsub（外部ユーザID）、tenant_id、aud=weknora、exp（有効期間は最大24時間）を含める必要があります。',
       directHeader: 'ユーザIDヘッダー',
       requireDirectHeader: 'ユーザIDヘッダーを必須にする',
       requireDirectHeaderDesc: '有効にすると、ユーザIDヘッダーのないAPIキーリクエストは拒否されます。無効の場合、すべてのリクエストはユーザを区別せずワークスペース全体として扱われます。',
       tokenHeader: 'トークンヘッダー',
       tokenHeaderDesc: 'クライアントはバックエンドで署名したJWTをこの固定ヘッダーで送信します。',
       hmacSecret: 'HMACシークレット',
-      hmacSecretDesc: 'WeKnoraに保存されているものと同じシークレットです。JWTの署名のためバックエンドでのみ使用し、リクエストヘッダーとして送信しないでください。',
+      hmacSecretDesc: '设计院知识库に保存されているものと同じシークレットです。JWTの署名のためバックエンドでのみ使用し、リクエストヘッダーとして送信しないでください。',
       secretConfigured: 'シークレットは設定済みです（再表示されません）。ローテーションするには新しい値を入力してください',
       secretSavedCopyHint: 'シークレットを保存しました。このページを離れると再表示できないため、今すぐバックエンドにコピーしてください。',
       generateSecret: 'シークレットを生成',
@@ -981,7 +981,7 @@ export default {
     },
     chrome: {
       title: 'ナレッジアシスタント',
-      subtitle: 'セルフホスト版WeKnora向け: ブラウジング中にサイドバーで質問したり、Webページをクリップしたり、Markdownメモをナレッジベースに保存したりできます。',
+      subtitle: 'セルフホスト版设计院知识库向け: ブラウジング中にサイドバーで質問したり、Webページをクリップしたり、Markdownメモをナレッジベースに保存したりできます。',
       capabilitiesTitle: '主な機能',
       capabilities: {
         qa: {
@@ -1015,7 +1015,7 @@ export default {
         },
         port: {
           title: 'デスクトップ版: 固定ポートの設定（推奨）',
-          desc: 'WeKnoraデスクトップ版では、API情報で固定ポート（例: 37841）を設定すると、再起動してもURLが変わりません。'
+          desc: '设计院知识库デスクトップ版では、API情報で固定ポート（例: 37841）を設定すると、再起動してもURLが変わりません。'
         },
         install: {
           title: '拡張機能をインストール',
@@ -1034,8 +1034,8 @@ export default {
       storeMeta: 'Chromeウェブストア · v1.0.0'
     },
     claw: {
-      title: 'WeKnora Skill',
-      subtitle: 'WeKnora REST API経由でドキュメントをインポートし、ハイブリッド検索（ベクトル＋キーワード）を実行します。ファイルのアップロード、URLインポート、Markdownでの登録、ナレッジベース横断検索に対応します。',
+      title: '设计院知识库 Skill',
+      subtitle: '设计院知识库 REST API経由でドキュメントをインポートし、ハイブリッド検索（ベクトル＋キーワード）を実行します。ファイルのアップロード、URLインポート、Markdownでの登録、ナレッジベース横断検索に対応します。',
       capabilitiesTitle: 'スキルの機能',
       capabilities: {
         upload: {
@@ -1084,7 +1084,7 @@ export default {
       copyCmdSuccess: 'インストールコマンドをコピーしました',
       ecosystemNote: 'スキルはClawHub（{\'@\'}lyingbug/weknora）でホストされています。完全なAPIドキュメントとバージョン履歴はClawHubページをご覧ください。',
       installCta: 'ClawHubを開く',
-      installCtaHint: 'WeKnora Skillをインストール · 新しいタブで開きます',
+      installCtaHint: '设计院知识库 Skillをインストール · 新しいタブで開きます',
       hubMeta: 'ClawHub · {\'@\'}lyingbug/weknora · MIT-0'
     }
   }

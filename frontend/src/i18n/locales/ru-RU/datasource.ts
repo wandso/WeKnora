@@ -1,7 +1,7 @@
 export default {
   integrations: {
     cli: {
-      title: 'WeKnora CLI',
+      title: '设计院知识库 CLI',
       subtitle: 'Управляйте базами знаний и документами, ищите информацию и задавайте вопросы из терминала. Подключайте скрипты и инструменты ИИ через CLI или MCP.',
       docs: 'Документация CLI',
       docsHint: 'Установка и полный справочник команд',
@@ -27,8 +27,8 @@ export default {
     filterByAgentWithName: 'Фильтр по агенту: {name}',
     filterAllAgents: 'Все агенты',
     claw: {
-      title: 'WeKnora Skill',
-      subtitle: 'Импорт документов и гибридный поиск (вектор + ключевые слова) через REST API WeKnora — загрузки, URL, Markdown и поиск.',
+      title: '设计院知识库 Skill',
+      subtitle: 'Импорт документов и гибридный поиск (вектор + ключевые слова) через REST API 设计院知识库 — загрузки, URL, Markdown и поиск.',
       capabilitiesTitle: 'Возможности Skill',
       stepsTitle: 'Шаги настройки',
       openApiSettings: 'Открыть API-информацию',
@@ -37,7 +37,7 @@ export default {
       copyCmdSuccess: 'Команда установки скопирована',
       ecosystemNote: 'Skill размещён на ClawHub ({\'@\'}lyingbug/weknora). Полная документация API — на странице ClawHub.',
       installCta: 'Открыть ClawHub',
-      installCtaHint: 'Установка WeKnora Skill · откроется в новой вкладке',
+      installCtaHint: 'Установка 设计院知识库 Skill · откроется в новой вкладке',
       hubMeta: 'ClawHub · {\'@\'}lyingbug/weknora · MIT-0',
       steps: {
         verify: {
@@ -82,7 +82,7 @@ export default {
     },
     chrome: {
       title: 'Помощник по знаниям',
-      subtitle: 'Для self-hosted WeKnora: вопросы в боковой панели, клиппинг страниц и Markdown-заметки в базы знаний прямо при просмотре.',
+      subtitle: 'Для self-hosted 设计院知识库: вопросы в боковой панели, клиппинг страниц и Markdown-заметки в базы знаний прямо при просмотре.',
       capabilitiesTitle: 'Возможности',
       stepsTitle: 'Шаги настройки',
       openApiSettings: 'Открыть API-информацию',
@@ -102,7 +102,7 @@ export default {
         },
         port: {
           title: 'Десктоп: фиксированный порт',
-          desc: 'В WeKnora Desktop задайте фиксированный порт API (например 37841) в API-информации.'
+          desc: 'В 设计院知识库 Desktop задайте фиксированный порт API (например 37841) в API-информации.'
         },
         api: {
           title: 'Получите API-учётные данные',
@@ -191,7 +191,7 @@ export default {
       capabilityMessageHistory: 'История сообщений',
       capabilityMessageHistoryHint: 'Позволяет искать историю чатов пространства и читать статистику истории. Не даёт доступ к настройкам пространства.',
       capabilityManageModels: 'Управление моделями',
-      capabilityManageModelsHint: 'Управление конфигурациями моделей, учётными данными, проверками подключения и данными WeKnoraCloud.',
+      capabilityManageModelsHint: 'Управление конфигурациями моделей, учётными данными, проверками подключения и данными 设计院知识库Cloud.',
       capabilityManageMcpServices: 'Управление MCP-сервисами',
       capabilityManageMcpServicesHint: 'Управление MCP-сервисами, учётными данными, политиками подтверждения инструментов и OAuth-состоянием этого субъекта.',
       capabilityManageDatasources: 'Управление источниками данных',
@@ -238,14 +238,14 @@ export default {
       directWarning: 'Прямой ID доверяет заголовку вызывающей стороны. Используйте только для доверенных server-to-server вызовов.',
       directWarningDetail: 'Любой, у кого есть API key, может подменить заголовок ID пользователя, выдать себя за другого внешнего пользователя и переиспользовать или перехватить его авторизацию MCP OAuth. Не используйте в браузере или ненадёжных клиентах; для пользовательских приложений выбирайте подписанный token.',
       signedRecommended: 'Рекомендуется для пользовательских приложений: ваш backend подписывает краткоживущий HS256 JWT для внешнего пользователя.',
-      signedFlowDetail: 'HMAC secret храните только в WeKnora и на доверенном backend — не передавайте в запросах и не отдавайте браузеру. В заголовке запроса передаётся JWT, подписанный этим secret (меняется при каждой выдаче или после истечения), а не сам secret. JWT должен содержать sub (ID внешнего пользователя), tenant_id, aud=weknora и exp (не более 24 ч).',
+      signedFlowDetail: 'HMAC secret храните только в 设计院知识库 и на доверенном backend — не передавайте в запросах и не отдавайте браузеру. В заголовке запроса передаётся JWT, подписанный этим secret (меняется при каждой выдаче или после истечения), а не сам secret. JWT должен содержать sub (ID внешнего пользователя), tenant_id, aud=weknora и exp (не более 24 ч).',
       directHeader: 'Заголовок ID пользователя',
       requireDirectHeader: 'Требовать заголовок ID пользователя',
       requireDirectHeaderDesc: 'Если включено, запросы без заголовка ID пользователя отклоняются; иначе все запросы обрабатываются как единое пространство без различия конечных пользователей.',
       tokenHeader: 'Заголовок token',
       tokenHeaderDesc: 'Клиент передаёт JWT, подписанный backend, в этом фиксированном заголовке.',
       hmacSecret: 'HMAC secret',
-      hmacSecretDesc: 'Тот же secret, что в WeKnora; только для подписи JWT на backend — не отправляйте его в заголовке запроса.',
+      hmacSecretDesc: 'Тот же secret, что в 设计院知识库; только для подписи JWT на backend — не отправляйте его в заголовке запроса.',
       secretConfigured: 'Secret настроен (повторно не показывается); введите новое значение для ротации',
       secretSavedCopyHint: 'Secret сохранён. Скопируйте его в backend сейчас — после ухода со страницы просмотреть его будет нельзя.',
       generateSecret: 'Сгенерировать secret',
@@ -988,7 +988,7 @@ export default {
     welcomeMessageDesc: 'Показывается во встроенном чате до первого сообщения посетителя; оставьте пустым, чтобы скрыть',
     showSuggestedQuestions: 'Рекомендуемые вопросы',
     showSuggestedQuestionsDesc: 'Показывать быстрые вопросы до первого сообщения посетителя — из настроек агента и связанных баз знаний',
-    originsHint: 'Укажите сайты, которым разрешено встраивание (A), а не адрес WeKnora (B). Один полный Origin на строку, например https://shop.example.com; минимум один. Поддерживается *.example.com.',
+    originsHint: 'Укажите сайты, которым разрешено встраивание (A), а не адрес 设计院知识库 (B). Один полный Origin на строку, например https://shop.example.com; минимум один. Поддерживается *.example.com.',
     originsRequired: 'Укажите хотя бы один разрешённый домен',
     originsInvalid: 'Неверный домен: {origin}',
     originsWildcardProd: 'В production запрещён wildcard \'*\'',
@@ -1047,7 +1047,7 @@ export default {
     allowFileUploadDesc: 'При включении посетители видят кнопку загрузки изображений в поле ввода. Кнопка появляется только если у привязанного агента включена загрузка изображений.',
     webhookUrl: 'Webhook URL',
     webhookUrlPlaceholder: 'https://your-server.example.com/weknora/embed-events',
-    webhookUrlDesc: 'Optional. WeKnora POSTs message_sent / message_received events to this HTTPS endpoint.',
+    webhookUrlDesc: 'Optional. 设计院知识库 POSTs message_sent / message_received events to this HTTPS endpoint.',
     webhookSecret: 'Webhook secret',
     webhookSecretPlaceholder: 'HMAC-SHA256 secret (X-WeKnora-Signature header)',
     webhookSecretKeep: 'Leave blank to keep the saved secret',

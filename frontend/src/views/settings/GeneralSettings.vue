@@ -252,7 +252,7 @@ const handleLanguageChange = async () => {
     }
   } catch (err) {
     localLanguage.value = locale.value
-    console.error('[WeKnora] Failed to switch language:', err)
+    console.error('[设计院知识库] Failed to switch language:', err)
     MessagePlugin.error(t('common.failed'))
   }
 }

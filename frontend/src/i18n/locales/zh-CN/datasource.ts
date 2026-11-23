@@ -1,7 +1,7 @@
 export default {
   integrations: {
     cli: {
-      title: 'WeKnora CLI',
+      title: '设计院知识库 CLI',
       subtitle: '在终端中管理知识库和文档、检索内容并发起问答，也可通过脚本或 MCP 接入 AI 工具。',
       docs: '查看 CLI 文档',
       docsHint: '安装说明与完整命令参考',
@@ -27,8 +27,8 @@ export default {
     filterByAgentWithName: '按智能体筛选：{name}',
     filterAllAgents: '全部智能体',
     claw: {
-      title: 'WeKnora Skill',
-      subtitle: '通过 WeKnora REST API 导入文档并执行混合检索（向量 + 关键词）。适用于上传文件/URL/Markdown 到知识库、跨库检索与浏览知识内容。',
+      title: '设计院知识库 Skill',
+      subtitle: '通过 设计院知识库 REST API 导入文档并执行混合检索（向量 + 关键词）。适用于上传文件/URL/Markdown 到知识库、跨库检索与浏览知识内容。',
       capabilitiesTitle: 'Skill 能力',
       stepsTitle: '配置步骤',
       openApiSettings: '打开 API 信息',
@@ -37,7 +37,7 @@ export default {
       copyCmdSuccess: '已复制安装命令',
       ecosystemNote: 'Skill 托管于 ClawHub（{\'@\'}lyingbug/weknora），完整 API 说明与版本历史请参见 ClawHub 页面。',
       installCta: '前往 ClawHub',
-      installCtaHint: '安装 WeKnora Skill · 将在新标签页打开',
+      installCtaHint: '安装 设计院知识库 Skill · 将在新标签页打开',
       hubMeta: 'ClawHub · {\'@\'}lyingbug/weknora · MIT-0',
       steps: {
         verify: {
@@ -82,7 +82,7 @@ export default {
     },
     chrome: {
       title: '知识管理助手',
-      subtitle: '配合 WeKnora 自建服务使用：在任意网页侧边栏提问、剪藏内容、Markdown 速记，将浏览中的知识沉淀到你的知识库。',
+      subtitle: '配合 设计院知识库 自建服务使用：在任意网页侧边栏提问、剪藏内容、Markdown 速记，将浏览中的知识沉淀到你的知识库。',
       capabilitiesTitle: '核心能力',
       stepsTitle: '配置步骤',
       openApiSettings: '打开 API 信息',
@@ -102,7 +102,7 @@ export default {
         },
         port: {
           title: '桌面版配置固定端口（推荐）',
-          desc: '使用 WeKnora 桌面版时，在 API 信息中设置固定端口（如 37841），避免每次启动后地址变化导致插件断连。'
+          desc: '使用 设计院知识库 桌面版时，在 API 信息中设置固定端口（如 37841），避免每次启动后地址变化导致插件断连。'
         },
         api: {
           title: '获取 API 凭证',
@@ -191,7 +191,7 @@ export default {
       capabilityMessageHistory: '消息历史',
       capabilityMessageHistoryHint: '允许检索空间聊天历史并读取聊天历史统计；不授予空间配置权限。',
       capabilityManageModels: '管理模型',
-      capabilityManageModelsHint: '允许管理模型配置、模型凭据、模型连通性测试和 WeKnoraCloud 凭据。',
+      capabilityManageModelsHint: '允许管理模型配置、模型凭据、模型连通性测试和 设计院知识库Cloud 凭据。',
       capabilityManageMcpServices: '管理 MCP 服务',
       capabilityManageMcpServicesHint: '允许管理 MCP 服务、凭据、工具审批策略和该主体的 OAuth 授权状态。',
       capabilityManageDatasources: '管理数据源',
@@ -238,14 +238,14 @@ export default {
       directWarning: '直接传用户 ID 会信任调用方请求头，仅适用于可信服务端到服务端调用。',
       directWarningDetail: '任何持有 API Key 的调用方都可以通过修改用户 ID 请求头冒充其他外部用户，从而共用或劫持其 MCP OAuth 授权。请勿用于浏览器或不可信客户端；面向终端用户请使用「签名 Token」。',
       signedRecommended: '推荐给面向用户的应用：由你的业务后端为外部用户签发短期 HS256 JWT。',
-      signedFlowDetail: 'HMAC 密钥仅保存在 WeKnora 与你的可信后端，切勿放入请求或下发给浏览器。请求头里传的是用该密钥签出的 JWT 字符串（每次签发或过期后会变），不是密钥本身。JWT 须包含 sub（外部用户 ID）、tenant_id、aud=weknora、exp（有效期不超过 24 小时）。',
+      signedFlowDetail: 'HMAC 密钥仅保存在 设计院知识库 与你的可信后端，切勿放入请求或下发给浏览器。请求头里传的是用该密钥签出的 JWT 字符串（每次签发或过期后会变），不是密钥本身。JWT 须包含 sub（外部用户 ID）、tenant_id、aud=weknora、exp（有效期不超过 24 小时）。',
       directHeader: '用户 ID 请求头',
       requireDirectHeader: '必须携带用户 ID',
       requireDirectHeaderDesc: '开启后，缺少用户 ID 请求头的 API Key 请求将被拒绝；关闭则按整个空间统一处理，不区分具体终端用户。',
       tokenHeader: 'Token 请求头',
       tokenHeaderDesc: '客户端在该固定请求头中携带后端签发的 JWT。',
       hmacSecret: 'HMAC 密钥',
-      hmacSecretDesc: '与 WeKnora 保存的同一份密钥；仅用于后端签发 JWT，不要作为请求头发送。',
+      hmacSecretDesc: '与 设计院知识库 保存的同一份密钥；仅用于后端签发 JWT，不要作为请求头发送。',
       secretConfigured: '已配置密钥（不可回看）；输入新值可轮换',
       secretSavedCopyHint: '密钥已保存，请立即复制到后端配置。离开本页后将无法再次查看。',
       generateSecret: '生成密钥',
@@ -995,7 +995,7 @@ export default {
     welcomeMessageDesc: '访客打开嵌入聊天后、尚未发言时展示；留空则不显示',
     showSuggestedQuestions: '推荐问题',
     showSuggestedQuestionsDesc: '访客未发言前展示快捷提问，内容来自智能体配置与关联知识库',
-    originsHint: '填写允许嵌入的宿主网站来源（A），不是 WeKnora 地址（B）。每行一个完整 Origin，如 https://shop.example.com；至少一项，支持 *.example.com 子域通配',
+    originsHint: '填写允许嵌入的宿主网站来源（A），不是 设计院知识库 地址（B）。每行一个完整 Origin，如 https://shop.example.com；至少一项，支持 *.example.com 子域通配',
     originsRequired: '请至少填写一个域名白名单',
     originsInvalid: '域名格式无效：{origin}',
     originsWildcardProd: '生产环境不允许使用通配符 *',
@@ -1054,7 +1054,7 @@ export default {
     allowFileUploadDesc: '开启后，访客可上传图片与文档附件。仅当绑定的智能体已启用图片上传时才会生效。',
     webhookUrl: 'Webhook 地址',
     webhookUrlPlaceholder: 'https://your-server.example.com/weknora/embed-events',
-    webhookUrlDesc: '可选。访客发消息与助手回复完成时，WeKnora 会向该 HTTPS 地址 POST 事件（message_sent / message_received）。',
+    webhookUrlDesc: '可选。访客发消息与助手回复完成时，设计院知识库 会向该 HTTPS 地址 POST 事件（message_sent / message_received）。',
     webhookSecret: 'Webhook 签名密钥',
     webhookSecretPlaceholder: '用于 HMAC-SHA256 签名（X-WeKnora-Signature）',
     webhookSecretKeep: '留空表示不修改已保存的密钥',

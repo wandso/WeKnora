@@ -96,16 +96,16 @@ export default {
     reopen: 'Product tour',
     steps: {
       assistant: {
-        title: 'Meet the WeKnora Assistant',
-        desc: 'Ask about WeKnora versions, features and setup. Using the current page as context, the assistant can create agents, schedule tasks and organize knowledge on your behalf, within your permissions.'
+        title: 'Meet the 设计院知识库 Assistant',
+        desc: 'Ask about 设计院知识库 versions, features and setup. Using the current page as context, the assistant can create agents, schedule tasks and organize knowledge on your behalf, within your permissions.'
       },
       welcome: {
-        title: 'Welcome to WeKnora',
+        title: 'Welcome to 设计院知识库',
         desc: 'A few quick steps to get you familiar with knowledge bases, chat and agents. Click "Next" to begin.'
       },
       knowledge: {
         title: 'Create your knowledge base',
-        desc: 'Everything starts here: upload documents, web pages or FAQs and WeKnora parses and indexes them automatically. Click here to open knowledge bases.'
+        desc: 'Everything starts here: upload documents, web pages or FAQs and 设计院知识库 parses and indexes them automatically. Click here to open knowledge bases.'
       },
       chat: {
         title: 'Start an AI chat',

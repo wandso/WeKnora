@@ -773,7 +773,7 @@ export default {
       systemActor: 'システム',
       actorWithAPIKey: '{actor} · API Key · {name}',
       actorAPIKey: 'API Key · {name}',
-      viaAssistant: 'WeKnora アシスタント経由',
+      viaAssistant: '设计院知识库 アシスタント経由',
       knowledgeBase: 'ナレッジベース',
       countItems: '{count}件',
       titleWithCount: '{title}ほか{count}件',
@@ -1701,8 +1701,8 @@ export default {
           desc: 'PaddleOCR-VL Cloud API'
         },
         weknoracloud: {
-          name: 'WeKnora Cloud',
-          desc: 'WeKnora Cloudによるドキュメント解析'
+          name: '设计院知识库 Cloud',
+          desc: '设计院知识库 Cloudによるドキュメント解析'
         },
         markitdown: {
           name: 'MarkItDown',

@@ -2,9 +2,9 @@ export default {
   automation: {
     conversationNotice: '자동화 작업이 실행하는 대화입니다. 메시지를 직접 보낼 수 없습니다. 대기 중인 요청은 위에서 처리하세요.',
     title: '자동화',
-    description: 'WeKnora 도우미가 예약된 시간에 사용자를 대신해 작업을 실행합니다. 결과와 승인 대기 항목을 알려드립니다.',
+    description: '设计院知识库 도우미가 예약된 시간에 사용자를 대신해 작업을 실행합니다. 결과와 승인 대기 항목을 알려드립니다.',
     add: '새 자동화',
-    addHint: 'WeKnora 어시스턴트에게 만들어 달라고 할 수도 있습니다',
+    addHint: '设计院知识库 어시스턴트에게 만들어 달라고 할 수도 있습니다',
     paused: '일시 중지됨',
     scheduleEnded: '종료됨',
     scheduleEndedHint: '일회성 일정이 종료되었습니다. 지금 실행하거나 실행 시간을 변경한 후 재개하세요.',
@@ -56,7 +56,7 @@ export default {
       sections: {
         basic: {
           title: '기본 정보',
-          desc: 'WeKnora 도우미가 작업을 실행합니다. 다른 에이전트에 위임하려면 작업에 에이전트와 맡길 일을 명시하세요.'
+          desc: '设计院知识库 도우미가 작업을 실행합니다. 다른 에이전트에 위임하려면 작업에 에이전트와 맡길 일을 명시하세요.'
         },
         schedule: {
           title: '실행 시간',
@@ -1209,7 +1209,7 @@ export default {
     },
     hostApproval: {
       titleDelete: '파일을 삭제하기 전에 확인이 필요합니다',
-      titleDenied: 'WeKnora가 다음 디렉터리에 접근하려고 합니다',
+      titleDenied: '设计院知识库가 다음 디렉터리에 접근하려고 합니다',
       titleGeneric: '확인이 필요합니다',
       command: '명령',
       cwd: '디렉터리',
@@ -1249,7 +1249,7 @@ export default {
     }
   },
   assistant: {
-    title: 'WeKnora 어시스턴트',
+    title: '设计院知识库 어시스턴트',
     newConversation: '새 대화',
     history: '대화 기록',
     untitledConversation: '제목 없는 대화',
@@ -1263,10 +1263,10 @@ export default {
     },
     welcomeTitle: '무엇을 도와드릴까요?',
     agentWelcomeDesc: '이 에이전트의 설정을 확인하고, 모델을 변경하거나 검색할 수 있는 지식 베이스를 확인할 수 있습니다.',
-    welcomeDesc: 'WeKnora 사용법을 안내하고, 지식과 문서를 정리하며, 에이전트·도구·자동화 설정을 도와드릴 수 있습니다.',
+    welcomeDesc: '设计院知识库 사용법을 안내하고, 지식과 문서를 정리하며, 에이전트·도구·자동화 설정을 도와드릴 수 있습니다.',
     help: {
       label: '어시스턴트 설명',
-      title: 'WeKnora 어시스턴트가 할 수 있는 일',
+      title: '设计院知识库 어시스턴트가 할 수 있는 일',
       identity: '어시스턴트는 사용자 본인으로 동작합니다. 보고 수정할 수 있는 범위는 이 공간에서 가진 역할과 같으며, 그 권한을 넘지 않습니다.',
       page: '열면 현재 페이지가 함께 붙습니다. 화면의 내용을 정리하고, 에이전트와 자동화를 설정하거나, 양식을 대신 채울 수 있습니다. 버튼을 누르거나 저장하지는 않습니다.',
       access: '입력창 아래에서 권한을 바꿀 수 있습니다. 읽기 전용, 수정 전 확인, 되돌릴 수 있는 수정은 자동 실행. 삭제는 항상 확인이 필요하며, 관리자가 정한 상한은 넘을 수 없습니다.'
@@ -1356,8 +1356,8 @@ export default {
         q3: 'What should I check if Ollama will not connect?'
       },
       weknoracloud: {
-        description: 'I can explain which models WeKnora Cloud offers, and how to bind and choose them.',
-        q1: 'Which models does WeKnora Cloud provide?',
+        description: 'I can explain which models 设计院知识库 Cloud offers, and how to bind and choose them.',
+        q1: 'Which models does 设计院知识库 Cloud provide?',
         q2: 'How do I enable or bind a Cloud account?',
         q3: 'When should I use Cloud models versus ones I connect myself?'
       },
@@ -1482,14 +1482,14 @@ export default {
         q3: 'Is there a ready-made request example?'
       },
       'integration-mcpserver': {
-        description: 'I can explain how to expose WeKnora as an MCP server, and which tools it offers.',
-        q1: 'How do I offer WeKnora as an MCP server?',
+        description: 'I can explain how to expose 设计院知识库 as an MCP server, and which tools it offers.',
+        q1: 'How do I offer 设计院知识库 as an MCP server?',
         q2: 'How does an external client connect?',
         q3: 'Which tools does this server expose?'
       },
       'integration-cli': {
         description: 'I can walk you through installing and signing in to the CLI, and the common commands.',
-        q1: 'How do I install and sign in to the WeKnora CLI?',
+        q1: 'How do I install and sign in to the 设计院知识库 CLI?',
         q2: 'What knowledge-base and chat operations can the CLI do?',
         q3: 'What are the most useful commands?'
       },
@@ -1500,8 +1500,8 @@ export default {
         q3: 'Where does text I select in the extension get sent?'
       },
       'integration-claw': {
-        description: 'I can explain how to connect WeKnora to Claw, and which skill to install.',
-        q1: 'How do I connect WeKnora to Claw?',
+        description: 'I can explain how to connect 设计院知识库 to Claw, and which skill to install.',
+        q1: 'How do I connect 设计院知识库 to Claw?',
         q2: 'Which skill do I need to install?',
         q3: 'What can I do in Claw after it is connected?'
       }
@@ -1655,7 +1655,7 @@ export default {
       documentSummary: '이 문서의 핵심 결론은 무엇인가요?',
       failedDocuments: '이 지식 베이스에서 파싱에 실패한 문서는?',
       recentActivity: '최근에 업로드되거나 수정된 문서는 무엇인가요?',
-      formats: 'WeKnora는 어떤 문서 형식을 지원하나요?',
+      formats: '设计院知识库는 어떤 문서 형식을 지원하나요?',
       createWiki: 'Wiki 지식 베이스는 어떻게 만드나요?',
       agents: '이 에이전트들은 각각 어떤 질문에 적합한가요?',
       messageSources: '이 답변의 근거는 무엇인가요?',
@@ -1667,7 +1667,7 @@ export default {
       modelSetup: '어떤 모델을 더 설정해야 하나요?',
       mcpSetup: 'MCP 서비스는 어떻게 연결하나요?',
       releaseHighlights: '현재 버전에서 주로 무엇이 바뀌었나요?',
-      gettingStarted: 'WeKnora를 처음 사용할 때 무엇부터 설정해야 하나요?',
+      gettingStarted: '设计院知识库를 처음 사용할 때 무엇부터 설정해야 하나요?',
       workflow: '지식 베이스, 에이전트, 자동화를 어떻게 함께 활용하나요?',
       knowledgeOverview: '각 지식 베이스에서 어떤 내용을 찾을 수 있나요?',
       knowledgeType: '문서, FAQ, Wiki는 어떻게 구분해서 사용하나요?',

@@ -3,7 +3,7 @@
         <!-- 展开时：Logo + 搜索/折叠按钮同行 -->
         <div class="logo_row" v-if="!uiStore.sidebarCollapsed">
             <div class="logo_box" @click="router.push('/platform/knowledge-bases')" style="cursor: pointer;">
-                <img class="logo" src="@/assets/img/weknora.png" alt="">
+                <span class="logo">设计院知识库</span>
                 <sup v-if="isLiteEdition" class="lite-badge">Lite</sup>
             </div>
             <div class="logo_actions">
@@ -1403,8 +1403,14 @@ const resizeSidebar = (delta: number, keyboard: boolean) => {
         overflow: hidden;
 
         .logo {
-            width: 108px;
-            height: auto;
+            display: inline-flex;
+            align-items: center;
+            height: 32px;
+            font-size: 19px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            white-space: nowrap;
+            color: var(--td-brand-color, #0052d9);
         }
 
         .lite-badge {
@@ -2020,9 +2026,6 @@ const resizeSidebar = (delta: number, keyboard: boolean) => {
 </style>
 <style lang="less">
 // Dark mode: invert dark logo to light
-html[theme-mode="dark"] .aside_box .logo_box .logo {
-    filter: invert(1) hue-rotate(180deg);
-}
 
 // Dark mode: 滚动条在深色背景下需要更亮的颜色才看得见
 html[theme-mode="dark"] .aside_box .menu_top:hover {

@@ -42,7 +42,7 @@ export default {
     welcomeMessageDesc: 'Shown in the embed chat before the visitor sends their first message; leave blank to hide',
     showSuggestedQuestions: 'Suggested questions',
     showSuggestedQuestionsDesc: 'Show starter prompts before the first visitor message, from agent config and linked knowledge bases',
-    originsHint: 'Enter the host websites allowed to embed this channel (A), not the WeKnora address (B). One full origin per line, e.g. https://shop.example.com; at least one required. Supports *.example.com.',
+    originsHint: 'Enter the host websites allowed to embed this channel (A), not the 设计院知识库 address (B). One full origin per line, e.g. https://shop.example.com; at least one required. Supports *.example.com.',
     originsRequired: 'At least one allowed origin is required',
     originsInvalid: 'Invalid origin: {origin}',
     originsWildcardProd: 'Wildcard origin \'*\' is not allowed in production',
@@ -101,7 +101,7 @@ export default {
     allowFileUploadDesc: 'When enabled, visitors can upload images and document attachments. Requires the bound agent to support image upload.',
     webhookUrl: 'Webhook URL',
     webhookUrlPlaceholder: 'https://your-server.example.com/weknora/embed-events',
-    webhookUrlDesc: 'Optional. WeKnora POSTs message_sent / message_received events to this HTTPS endpoint.',
+    webhookUrlDesc: 'Optional. 设计院知识库 POSTs message_sent / message_received events to this HTTPS endpoint.',
     webhookSecret: 'Webhook secret',
     webhookSecretPlaceholder: 'HMAC-SHA256 secret (X-WeKnora-Signature header)',
     webhookSecretKeep: 'Leave blank to keep the saved secret',
@@ -672,7 +672,7 @@ export default {
   },
   integrations: {
     cli: {
-      title: 'WeKnora CLI',
+      title: '设计院知识库 CLI',
       subtitle: 'Manage knowledge bases and documents, search content, and ask questions from your terminal. Connect scripts and AI tools through the CLI or MCP.',
       docs: 'CLI documentation',
       docsHint: 'Installation and complete command reference',
@@ -853,7 +853,7 @@ export default {
       capabilityMessageHistory: 'Message history',
       capabilityMessageHistoryHint: 'Let this key search workspace chat history and read chat-history stats. It does not grant workspace configuration access.',
       capabilityManageModels: 'Manage models',
-      capabilityManageModelsHint: 'Manage model definitions, credentials, connectivity checks, and WeKnoraCloud credentials.',
+      capabilityManageModelsHint: 'Manage model definitions, credentials, connectivity checks, and 设计院知识库Cloud credentials.',
       capabilityManageMcpServices: 'Manage MCP services',
       capabilityManageMcpServicesHint: 'Manage MCP services, credentials, tool approval policies, and OAuth state for this principal.',
       capabilityManageDatasources: 'Manage data sources',
@@ -900,14 +900,14 @@ export default {
       directWarning: 'Direct user ID trusts the caller-supplied header. Use only for trusted server-to-server calls.',
       directWarningDetail: 'Anyone with the API key can change the user ID header to impersonate another external user and reuse or hijack that user\'s MCP OAuth authorization. Do not use this from browsers or untrusted clients; use Signed token for end-user apps.',
       signedRecommended: 'Recommended for user-facing apps: your backend signs a short-lived HS256 JWT for the external user.',
-      signedFlowDetail: 'Keep the HMAC secret only on WeKnora and your trusted backend—never put it in requests or ship it to browsers. The request header carries the JWT string signed with that secret (it changes on each issuance or after expiry), not the secret itself. JWT must include sub (external user ID), tenant_id, aud=weknora, and exp (max 24h lifetime).',
+      signedFlowDetail: 'Keep the HMAC secret only on 设计院知识库 and your trusted backend—never put it in requests or ship it to browsers. The request header carries the JWT string signed with that secret (it changes on each issuance or after expiry), not the secret itself. JWT must include sub (external user ID), tenant_id, aud=weknora, and exp (max 24h lifetime).',
       directHeader: 'User ID header',
       requireDirectHeader: 'Require user ID header',
       requireDirectHeaderDesc: 'When enabled, API Key requests without the user ID header are rejected; when disabled, all requests are treated as the whole workspace with no per-user distinction.',
       tokenHeader: 'Token header',
       tokenHeaderDesc: 'Clients send the backend-signed JWT in this fixed header.',
       hmacSecret: 'HMAC secret',
-      hmacSecretDesc: 'Same secret stored in WeKnora; used only on your backend to sign JWTs—never send it as a request header.',
+      hmacSecretDesc: 'Same secret stored in 设计院知识库; used only on your backend to sign JWTs—never send it as a request header.',
       secretConfigured: 'Secret configured (not shown again); enter a new value to rotate',
       secretSavedCopyHint: 'Secret saved. Copy it to your backend now — you will not be able to view it again after leaving this page.',
       generateSecret: 'Generate secret',
@@ -981,7 +981,7 @@ export default {
     },
     chrome: {
       title: 'Knowledge Assistant',
-      subtitle: 'For self-hosted WeKnora: ask questions in a sidebar, clip web pages, and save Markdown notes into your knowledge bases while you browse.',
+      subtitle: 'For self-hosted 设计院知识库: ask questions in a sidebar, clip web pages, and save Markdown notes into your knowledge bases while you browse.',
       capabilitiesTitle: 'Core capabilities',
       capabilities: {
         qa: {
@@ -1015,7 +1015,7 @@ export default {
         },
         port: {
           title: 'Desktop: fixed port (recommended)',
-          desc: 'On WeKnora Desktop, set a fixed API port (e.g. 37841) in API Info so the URL stays stable across restarts.'
+          desc: 'On 设计院知识库 Desktop, set a fixed API port (e.g. 37841) in API Info so the URL stays stable across restarts.'
         },
         install: {
           title: 'Install the extension',
@@ -1034,8 +1034,8 @@ export default {
       storeMeta: 'Chrome Web Store · v1.0.0'
     },
     claw: {
-      title: 'WeKnora Skill',
-      subtitle: 'Import documents and run hybrid retrieval (vector + keyword) via the WeKnora REST API—for uploads, URL imports, Markdown entries, and cross-KB search.',
+      title: '设计院知识库 Skill',
+      subtitle: 'Import documents and run hybrid retrieval (vector + keyword) via the 设计院知识库 REST API—for uploads, URL imports, Markdown entries, and cross-KB search.',
       capabilitiesTitle: 'Skill capabilities',
       capabilities: {
         upload: {
@@ -1084,7 +1084,7 @@ export default {
       copyCmdSuccess: 'Install command copied',
       ecosystemNote: 'Skill hosted on ClawHub ({\'@\'}lyingbug/weknora). See the ClawHub page for full API docs and version history.',
       installCta: 'Open ClawHub',
-      installCtaHint: 'Install WeKnora Skill · opens in a new tab',
+      installCtaHint: 'Install 设计院知识库 Skill · opens in a new tab',
       hubMeta: 'ClawHub · {\'@\'}lyingbug/weknora · MIT-0'
     }
   }

@@ -1,7 +1,7 @@
 export default {
   integrations: {
     cli: {
-      title: 'WeKnora CLI',
+      title: '设计院知识库 CLI',
       subtitle: '터미널에서 지식 베이스와 문서를 관리하고, 콘텐츠를 검색하고, 질문하세요. CLI 또는 MCP로 스크립트와 AI 도구를 연결할 수 있습니다.',
       docs: 'CLI 문서 보기',
       docsHint: '설치 안내 및 전체 명령어 참조',
@@ -27,8 +27,8 @@ export default {
     filterByAgentWithName: '에이전트별 필터: {name}',
     filterAllAgents: '전체 에이전트',
     claw: {
-      title: 'WeKnora Skill',
-      subtitle: 'WeKnora REST API로 문서를 가져오고 하이브리드 검색(벡터+키워드)을 수행합니다. 파일/URL/Markdown 업로드 및 검색에 사용.',
+      title: '设计院知识库 Skill',
+      subtitle: '设计院知识库 REST API로 문서를 가져오고 하이브리드 검색(벡터+키워드)을 수행합니다. 파일/URL/Markdown 업로드 및 검색에 사용.',
       capabilitiesTitle: 'Skill 기능',
       stepsTitle: '구성 단계',
       openApiSettings: 'API 정보 열기',
@@ -37,7 +37,7 @@ export default {
       copyCmdSuccess: '설치 명령이 복사되었습니다',
       ecosystemNote: 'Skill은 ClawHub({\'@\'}lyingbug/weknora)에 호스팅됩니다. 전체 API 문서는 ClawHub 페이지를 참고하세요.',
       installCta: 'ClawHub 열기',
-      installCtaHint: 'WeKnora Skill 설치 · 새 탭에서 열림',
+      installCtaHint: '设计院知识库 Skill 설치 · 새 탭에서 열림',
       hubMeta: 'ClawHub · {\'@\'}lyingbug/weknora · MIT-0',
       steps: {
         verify: {
@@ -82,7 +82,7 @@ export default {
     },
     chrome: {
       title: '지식 관리 어시스턴트',
-      subtitle: '자체 호스팅 WeKnora와 함께: 사이드바에서 질문하고, 웹 페이지를 클리핑하며, Markdown 메모를 지식베이스에 저장하세요.',
+      subtitle: '자체 호스팅 设计院知识库와 함께: 사이드바에서 질문하고, 웹 페이지를 클리핑하며, Markdown 메모를 지식베이스에 저장하세요.',
       capabilitiesTitle: '핵심 기능',
       stepsTitle: '구성 단계',
       openApiSettings: 'API 정보 열기',
@@ -102,7 +102,7 @@ export default {
         },
         port: {
           title: '데스크톱: 고정 포트(권장)',
-          desc: 'WeKnora 데스크톱에서는 API 정보에서 고정 포트(예: 37841)를 설정하세요.'
+          desc: '设计院知识库 데스크톱에서는 API 정보에서 고정 포트(예: 37841)를 설정하세요.'
         },
         api: {
           title: 'API 자격 증명',
@@ -191,7 +191,7 @@ export default {
       capabilityMessageHistory: '메시지 기록',
       capabilityMessageHistoryHint: '워크스페이스 채팅 기록 검색과 채팅 기록 통계 조회를 허용합니다. 워크스페이스 설정 권한은 부여하지 않습니다.',
       capabilityManageModels: '모델 관리',
-      capabilityManageModelsHint: '모델 설정, 자격 증명, 연결 테스트 및 WeKnoraCloud 자격 증명을 관리합니다.',
+      capabilityManageModelsHint: '모델 설정, 자격 증명, 연결 테스트 및 设计院知识库Cloud 자격 증명을 관리합니다.',
       capabilityManageMcpServices: 'MCP 서비스 관리',
       capabilityManageMcpServicesHint: 'MCP 서비스, 자격 증명, 도구 승인 정책 및 이 주체의 OAuth 상태를 관리합니다.',
       capabilityManageDatasources: '데이터 소스 관리',
@@ -238,14 +238,14 @@ export default {
       directWarning: '직접 사용자 ID 모드는 요청 헤더를 신뢰합니다. 신뢰된 서버 간 호출에만 사용하세요.',
       directWarningDetail: 'API Key를 가진 호출자는 사용자 ID 헤더를 바꿔 다른 외부 사용자를 가장하고 해당 사용자의 MCP OAuth 인증을 공유하거나 탈취할 수 있습니다. 브라우저나 신뢰할 수 없는 클라이언트에는 사용하지 마세요. 최종 사용자 앱에는 서명 토큰을 사용하세요.',
       signedRecommended: '사용자 대상 앱에 권장: 비즈니스 백엔드가 외부 사용자용 단기 HS256 JWT를 서명합니다.',
-      signedFlowDetail: 'HMAC secret은 WeKnora와 신뢰할 수 있는 백엔드에만 보관하세요. 요청에 넣거나 브라우저에 배포하지 마세요. 요청 헤더에는 secret이 아니라 해당 secret으로 서명한 JWT 문자열을 넣습니다(발급마다 또는 만료 후 변경). JWT에는 sub(외부 사용자 ID), tenant_id, aud=weknora, exp(최대 24시간)가 필요합니다.',
+      signedFlowDetail: 'HMAC secret은 设计院知识库와 신뢰할 수 있는 백엔드에만 보관하세요. 요청에 넣거나 브라우저에 배포하지 마세요. 요청 헤더에는 secret이 아니라 해당 secret으로 서명한 JWT 문자열을 넣습니다(발급마다 또는 만료 후 변경). JWT에는 sub(외부 사용자 ID), tenant_id, aud=weknora, exp(최대 24시간)가 필요합니다.',
       directHeader: '사용자 ID 헤더',
       requireDirectHeader: '사용자 ID 헤더 필수',
       requireDirectHeaderDesc: '켜면 사용자 ID 헤더가 없는 API Key 요청을 거부하고, 끄면 워크스페이스 전체로 통일 처리하며 개별 사용자를 구분하지 않습니다.',
       tokenHeader: '토큰 헤더',
       tokenHeaderDesc: '클라이언트는 이 고정 헤더에 백엔드가 서명한 JWT를 전달합니다.',
       hmacSecret: 'HMAC secret',
-      hmacSecretDesc: 'WeKnora에 저장된 것과 동일한 secret. 백엔드에서 JWT 서명에만 사용하며 요청 헤더로 보내지 않습니다.',
+      hmacSecretDesc: '设计院知识库에 저장된 것과 동일한 secret. 백엔드에서 JWT 서명에만 사용하며 요청 헤더로 보내지 않습니다.',
       secretConfigured: 'Secret configured (not shown again); enter a new value to rotate',
       secretSavedCopyHint: 'Secret saved. Copy it to your backend now — you will not be able to view it again after leaving this page.',
       generateSecret: 'Secret 생성',
@@ -995,7 +995,7 @@ export default {
     welcomeMessageDesc: '방문자가 임베드 채팅을 열고 첫 메시지를 보내기 전에 표시됩니다. 비우면 표시하지 않습니다',
     showSuggestedQuestions: '추천 질문',
     showSuggestedQuestionsDesc: '방문자 첫 메시지 전에 빠른 질문을 표시합니다(에이전트 설정 및 연결된 지식베이스에서 가져옴)',
-    originsHint: 'WeKnora 주소(B)가 아닌 임베드를 허용할 호스트 웹사이트(A)를 입력하세요. 한 줄에 하나의 Origin(예: https://shop.example.com), 최소 1개. *.example.com 지원.',
+    originsHint: '设计院知识库 주소(B)가 아닌 임베드를 허용할 호스트 웹사이트(A)를 입력하세요. 한 줄에 하나의 Origin(예: https://shop.example.com), 최소 1개. *.example.com 지원.',
     originsRequired: '허용 도메인을 최소 1개 입력하세요',
     originsInvalid: '잘못된 도메인: {origin}',
     originsWildcardProd: '프로덕션에서는 와일드카드 \'*\'를 사용할 수 없습니다',
@@ -1054,7 +1054,7 @@ export default {
     allowFileUploadDesc: '활성화하면 방문자 입력창에 이미지 업로드 버튼이 표시됩니다. 연결된 에이전트에서 이미지 업로드가 활성화된 경우에만 버튼이 나타납니다.',
     webhookUrl: 'Webhook URL',
     webhookUrlPlaceholder: 'https://your-server.example.com/weknora/embed-events',
-    webhookUrlDesc: 'Optional. WeKnora POSTs message_sent / message_received events to this HTTPS endpoint.',
+    webhookUrlDesc: 'Optional. 设计院知识库 POSTs message_sent / message_received events to this HTTPS endpoint.',
     webhookSecret: 'Webhook secret',
     webhookSecretPlaceholder: 'HMAC-SHA256 secret (X-WeKnora-Signature header)',
     webhookSecretKeep: 'Leave blank to keep the saved secret',
