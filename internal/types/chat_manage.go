@@ -158,6 +158,14 @@ const (
 	RetrievalStageFilterTopK = "filter_top_k"
 )
 
+// DataAnalysisFailure records that automated SQL data analysis on a retrieved
+// tabular document was attempted and failed, so the answer prompt can warn the
+// model not to manually calculate exact aggregates from partial text excerpts.
+type DataAnalysisFailure struct {
+	FileName string
+	Reason   string
+}
+
 // RetrievalTruncation records that the passages in the model context are a
 // subset of this turn's ranked candidates.
 //
@@ -234,6 +242,9 @@ type PipelineState struct {
 	RerankDiagnostics *RerankDiagnostics `json:"-"`
 	// PassageGateDiagnostics records what the pre-rerank gate did this turn.
 	PassageGateDiagnostics *PassageGateDiagnostics `json:"-"`
+	// DataAnalysisFailure is non-nil when DATA_ANALYSIS attempted to load or
+	// query a tabular document and failed.
+	DataAnalysisFailure *DataAnalysisFailure `json:"-"`
 }
 
 // PipelineContext holds runtime context for the current pipeline execution.
